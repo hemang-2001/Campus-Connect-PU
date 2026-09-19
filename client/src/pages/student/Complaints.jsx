@@ -1,21 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../lib/supabaseClient';
+import { supabase, API_BASE } from '../../lib/supabaseClient';
 import Badge from '../../components/Badge';
 import Loader from '../../components/Loader';
 import EmptyState from '../../components/EmptyState';
-import { PlusCircle, MessageSquare, Clock, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, MessageSquare, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export default function Complaints() {
   const { session } = useAuth();
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchComplaints = async () => {
+  const fetchComplaints = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       setError('');
       const res = await fetch(`${API_BASE}/api/complaints`, {
         headers: {
@@ -27,30 +32,88 @@ export default function Complaints() {
       setComplaints(data.complaints || []);
     } catch (err) {
       console.error(err);
-      setError(err.message);
+      if (!isBackground) {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      } else {
+        setIsRefreshing(false);
+      }
     }
   };
 
   useEffect(() => {
-    if (session?.access_token) {
-      fetchComplaints();
-    }
+    if (!session?.access_token) return;
+
+    fetchComplaints(false);
+
+    // Auto-refresh interval (every 5 seconds)
+    const interval = setInterval(() => {
+      fetchComplaints(true);
+    }, 5000);
+
+    // Supabase Realtime subscription on complaints table
+    const channel = supabase
+      .channel('student-complaints-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'complaints' },
+        () => {
+          fetchComplaints(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [session]);
 
   return (
     <div style={{ padding: '16px 0' }}>
       <div className="flex-between mb-4">
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>My Complaints</h2>
-          <p className="text-xs text-muted">Track grievances submitted to university transport</p>
+          <div className="flex-row" style={{ gap: '8px', alignItems: 'center' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>My Complaints</h2>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                color: '#16a34a',
+                background: '#f0fdf4',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                border: '1px solid #bbf7d0'
+              }}
+            >
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
+              Live
+            </span>
+          </div>
+          <p className="text-xs text-muted">Track grievances submitted to university transport (auto-refreshes live)</p>
         </div>
 
-        <Link to="/complaints/new" className="btn btn-primary" style={{ fontSize: '0.8125rem', padding: '6px 12px' }}>
-          <PlusCircle size={16} />
-          <span>New</span>
-        </Link>
+        <div className="flex-row" style={{ gap: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ fontSize: '0.8125rem', padding: '6px 10px' }}
+            onClick={() => fetchComplaints(true)}
+            title="Refresh complaints"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} />
+          </button>
+          <Link to="/complaints/new" className="btn btn-primary" style={{ fontSize: '0.8125rem', padding: '6px 12px' }}>
+            <PlusCircle size={16} />
+            <span>New</span>
+          </Link>
+        </div>
       </div>
 
       {loading ? (
