@@ -54,55 +54,7 @@ export default function Login() {
       </div>
 
       <div className="card">
-        {/* Quick Demo Fill Buttons */}
-        <div
-          style={{
-            marginBottom: '16px',
-            padding: '10px 12px',
-            background: 'var(--blue-light)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid rgba(37, 99, 235, 0.2)'
-          }}
-        >
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--blue)', display: 'block', marginBottom: '8px' }}>
-            ⚡ Demo Accounts (Tap to auto-fill):
-          </span>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#fff', borderRadius: 'var(--radius-sm)' }}
-              onClick={() => {
-                setEmail('student@campus.edu');
-                setPassword('student123');
-              }}
-            >
-              🎓 Student
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#fff', borderRadius: 'var(--radius-sm)' }}
-              onClick={() => {
-                setEmail('driver@campus.edu');
-                setPassword('driver123');
-              }}
-            >
-              🚌 Driver
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#fff', borderRadius: 'var(--radius-sm)' }}
-              onClick={() => {
-                setEmail('admin@campus.edu');
-                setPassword('admin123');
-              }}
-            >
-              🛡️ Admin
-            </button>
-          </div>
-        </div>
+
 
         {errorMsg && (
           <div className="banner-alert banner-danger" role="alert">
