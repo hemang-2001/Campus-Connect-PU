@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../lib/supabaseClient';
+import { supabase, API_BASE } from '../../lib/supabaseClient';
 import Badge from '../../components/Badge';
 import Loader from '../../components/Loader';
 import EmptyState from '../../components/EmptyState';
@@ -11,14 +11,19 @@ export default function ComplaintsAdmin() {
   const [complaints, setComplaints] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [savingId, setSavingId] = useState(null);
   const [statusDrafts, setStatusDrafts] = useState({});
   const [noteDrafts, setNoteDrafts] = useState({});
   const [successMsg, setSuccessMsg] = useState('');
 
-  const fetchAllComplaints = async () => {
+  const fetchAllComplaints = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       const res = await fetch(`${API_BASE}/api/complaints`, {
         headers: {
           Authorization: `Bearer ${session?.access_token}`
@@ -29,26 +34,63 @@ export default function ComplaintsAdmin() {
       const list = data.complaints || [];
       setComplaints(list);
 
-      // Initialize edit drafts
-      const sMap = {};
-      const nMap = {};
-      list.forEach((c) => {
-        sMap[c.id] = c.status;
-        nMap[c.id] = c.admin_note || '';
+      // Preserve any draft currently being edited by admin; populate new ones
+      setStatusDrafts((prev) => {
+        const next = { ...prev };
+        list.forEach((c) => {
+          if (!next[c.id]) {
+            next[c.id] = c.status;
+          }
+        });
+        return next;
       });
-      setStatusDrafts(sMap);
-      setNoteDrafts(nMap);
+
+      setNoteDrafts((prev) => {
+        const next = { ...prev };
+        list.forEach((c) => {
+          if (next[c.id] === undefined) {
+            next[c.id] = c.admin_note || '';
+          }
+        });
+        return next;
+      });
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      } else {
+        setIsRefreshing(false);
+      }
     }
   };
 
   useEffect(() => {
-    if (session?.access_token) {
-      fetchAllComplaints();
-    }
+    if (!session?.access_token) return;
+
+    fetchAllComplaints(false);
+
+    // Auto-refresh interval (every 5 seconds)
+    const interval = setInterval(() => {
+      fetchAllComplaints(true);
+    }, 5000);
+
+    // Supabase Realtime channel subscription for complaints
+    const channel = supabase
+      .channel('admin-complaints-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'complaints' },
+        () => {
+          fetchAllComplaints(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [session]);
 
   const handleSaveComplaint = async (id) => {
@@ -74,7 +116,7 @@ export default function ComplaintsAdmin() {
 
       setSuccessMsg('Complaint updated successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
-      fetchAllComplaints();
+      fetchAllComplaints(true);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -91,17 +133,37 @@ export default function ComplaintsAdmin() {
     <div style={{ padding: '16px 0' }}>
       <div className="flex-between mb-3">
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Student Complaints</h2>
-          <p className="text-xs text-muted">Review, escalate, and resolve student grievances</p>
+          <div className="flex-row" style={{ gap: '8px', alignItems: 'center' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Student Complaints</h2>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                color: '#16a34a',
+                background: '#f0fdf4',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                border: '1px solid #bbf7d0'
+              }}
+            >
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }} />
+              Live
+            </span>
+          </div>
+          <p className="text-xs text-muted">Review, escalate, and resolve student grievances (auto-refreshes live)</p>
         </div>
 
         <button
           type="button"
           className="btn btn-outline"
           style={{ padding: '6px 12px', fontSize: '0.8125rem' }}
-          onClick={fetchAllComplaints}
+          onClick={() => fetchAllComplaints(true)}
+          title="Refresh complaints"
         >
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} /> Refresh
         </button>
       </div>
 
