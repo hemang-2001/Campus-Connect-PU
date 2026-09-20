@@ -520,6 +520,21 @@ body {
   font-weight: 800;
   color: #2563eb;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: all 0.2s ease;
+}
+
+.stop-marker-pin.next-stop-pin {
+  background: #2563eb;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.35), 0 4px 10px rgba(0, 0, 0, 0.2);
+  animation: pulse-stop 2s infinite;
+}
+
+@keyframes pulse-stop {
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.6), 0 4px 10px rgba(0, 0, 0, 0.2); }
+  70% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0), 0 4px 10px rgba(0, 0, 0, 0.2); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0), 0 4px 10px rgba(0, 0, 0, 0.2); }
 }
 
 /* States: Loader, Empty, Error */
