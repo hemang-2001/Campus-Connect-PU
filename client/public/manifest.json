@@ -1,0 +1,71 @@
+{
+  "name": "Campus Connect — University Shuttle Tracking",
+  "short_name": "CampusConnect",
+  "description": "Real-time university shuttle telemetry, driver GPS broadcast, and campus route maps.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay", "minimal-ui"],
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "categories": ["travel", "navigation", "education"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Shuttles",
+      "short_name": "Shuttles",
+      "description": "View live campus shuttle locations on the map",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icons/icon-192.svg",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Driver Cockpit",
+      "short_name": "Driver",
+      "description": "Broadcast live GPS coordinates from your smartphone",
+      "url": "/driver",
+      "icons": [
+        {
+          "src": "/icons/icon-192.svg",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Campus Alerts",
+      "short_name": "Alerts",
+      "description": "Read transport notices and shuttle delay advisories",
+      "url": "/alerts",
+      "icons": [
+        {
+          "src": "/icons/icon-192.svg",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

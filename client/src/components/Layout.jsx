@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import BottomNav from './BottomNav';
+import InstallPrompt from './InstallPrompt';
 import { Bus, LogOut, ShieldAlert } from 'lucide-react';
 
 export default function Layout() {
@@ -56,6 +57,9 @@ export default function Layout() {
       <main className={`main-content ${isMapRoute ? 'no-pad' : ''}`}>
         <Outlet />
       </main>
+
+          {/* PWA Floating Install Prompt */}
+      <InstallPrompt />
 
       {/* Role-Aware Bottom Navigation */}
       <BottomNav />
