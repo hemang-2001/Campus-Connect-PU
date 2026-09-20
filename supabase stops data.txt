@@ -1,0 +1,77 @@
+-- 1. Create your new university route
+INSERT INTO public.routes (id, name, color, is_active)
+VALUES (
+  'a1b2c3d4-0000-4000-8000-000000000001'::UUID,
+  'Route 1 Gate-2 - SJ Campus',
+  '#2563eb',
+  true
+)
+-- 1. Create your new university route from sj to library route
+INSERT INTO public.routes (id, name, color, is_active)
+VALUES (
+  'a1b2c3d4-0000-4000-8000-000000000002'::UUID,
+  'Route 2 SJ Campus - Library',
+  '#8e7cc3',
+  true
+)
+
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+
+-- 2. Add the stops along the route in sequence (seq 1, 2, 3, 4...)
+INSERT INTO public.bus_stops (route_id, name, lat, lng, seq)
+VALUES
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'University Main Gate 1', 12.019596, 79.859077, 1),
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Reading Room/MBA Department', 12.020898, 79.855204, 2),
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'DODE & Shoping Complex', 12.017507960113184,79.85359227986794, 3),
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Health Care Center', 12.019433535940449,79.85025024915788, 4)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Ganga Girls Hostel', 12.021689291778797,79.84913030011211, 5)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Mother Teresa Mess', 12.022298159557097,79.84798964277336, 6)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Narmada Hostel', 12.022996, 79.847145, 7)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Kannagi Hostel', 12.024014, 79.846627, 8)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Open Air Theatre', 12.026560, 79.847402, 9)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'SRK Hostel', 12.028648, 79.848145, 10)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Maka Hostel', 12.029502, 79.848864, 11)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Amudham Mess', 12.029689, 79.850907, 12)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Mega Mess (Annapoorna Mess)', 12.028901592664148,79.85281164615535, 13)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Ilango Adigal Hostel', 12.028421, 79.853046, 14)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'CV Raman', 12.027551, 79.853500, 15)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Food Science Department', 12.028450, 79.855478, 16)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Electronic Media & Mass Communication', 12.032192, 79.856872, 17)
+  ('a1b2c3d4-0000-4000-8000-000000000001'::UUID, 'Silver Jubilee Campus', 12.033146, 79.857535, 18)
+-- 1. Create your new university route from sj to library route
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Silver Jubilee Campus', 12.033146, 79.857535, 1)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Electronic Media & Mass Communication', 12.032192, 79.856872, 2)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Food Science Department', 12.028450, 79.855478, 3)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'CV Raman', 12.027551, 79.853500, 4)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Ilango Adigal Hostel', 12.028421, 79.853046, 5)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Mega Mess (Annapoorna Mess)', 12.028901592664148,79.85281164615535, 6)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Amudham Mess', 12.029689, 79.850907, 7)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Maka Hostel', 12.029502, 79.848864, 8)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'SRK Hostel', 12.028648, 79.848145, 9)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Open Air Theatre', 12.026560, 79.847402, 10)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Kannagi Hostel', 12.024027, 79.846717, 11)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Kalpana Chawala Hostel', 12.023131, 79.847185, 12)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Madame Curie Hostel', 12.022422, 79.847967, 13)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Ganga Hostel', 12.021954, 79.849102, 14)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Health Center', 12.019284, 79.850438, 15)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'DODE & Shoping Complex', 12.017663, 79.853533, 16)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Reading Room/MBA Department', 12.021037, 79.855186, 17)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Library', 12.020583, 79.856519, 18)
+  ('a1b2c3d4-0000-4000-8000-000000000002'::UUID, 'Gate 1 Bus-Stop', 12.019548, 79.859607, 19)
+
+
+
+
+
+
+
+ON CONFLICT (route_id, seq) DO UPDATE SET
+  name = EXCLUDED.name,
+  lat = EXCLUDED.lat,
+  lng = EXCLUDED.lng;
+
+-- 3. Assign a bus to this route
+INSERT INTO public.buses (plate_no, capacity, route_id, is_active)
+VALUES ('CAMPUS-BUS-01', 45, 'a1b2c3d4-0000-4000-8000-000000000001'::UUID, true)
+VALUES ('CAMPUS-BUS-02', 45, 'a1b2c3d4-0000-4000-8000-000000000002'::UUID, true)
+ON CONFLICT (plate_no) DO UPDATE SET route_id = EXCLUDED.route_id;
