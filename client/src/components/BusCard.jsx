@@ -1,6 +1,7 @@
 import React from 'react';
 import Badge from './Badge';
-import { Bus, Gauge, Clock, Users } from 'lucide-react';
+import { Bus, Gauge, Clock, Users, MapPin } from 'lucide-react';
+import { getBusETA } from '../lib/eta';
 
 function formatRelativeTime(dateString) {
   if (!dateString) return 'No signal';
@@ -12,11 +13,12 @@ function formatRelativeTime(dateString) {
   return `${Math.floor(diffMin / 60)}h ago`;
 }
 
-export default function BusCard({ bus, isSelected, onSelect }) {
+export default function BusCard({ bus, stops = [], isSelected, onSelect }) {
   const routeName = bus.route?.name || 'Unassigned Route';
   const routeColor = bus.route?.color || '#2563eb';
   const speed = bus.location?.speed_kmh ?? 0;
   const lastUpdate = formatRelativeTime(bus.location?.updated_at);
+  const etaInfo = getBusETA(bus, stops);
 
   return (
     <div
@@ -66,12 +68,74 @@ export default function BusCard({ bus, isSelected, onSelect }) {
         <Badge status={bus.status} />
       </div>
 
+      {/* Next Stop & ETA Banner */}
+      {etaInfo?.nextStop ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: etaInfo.isArriving ? 'var(--emerald-light)' : 'var(--blue-light)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '6px 10px',
+            marginBottom: '8px',
+            border: `1px solid ${
+              etaInfo.isArriving ? 'rgba(16, 185, 129, 0.25)' : 'rgba(37, 99, 235, 0.15)'
+            }`
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+            <MapPin
+              size={14}
+              color={etaInfo.isArriving ? 'var(--emerald)' : 'var(--blue)'}
+              style={{ flexShrink: 0 }}
+            />
+            <span
+              style={{
+                fontSize: '0.8125rem',
+                color: 'var(--text-primary)',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden'
+              }}
+            >
+              Next: <strong>{etaInfo.nextStop.name}</strong>
+            </span>
+          </div>
+          <span
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-full)',
+              whiteSpace: 'nowrap',
+              backgroundColor: etaInfo.isArriving ? 'var(--emerald)' : 'var(--blue)',
+              color: '#ffffff',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}
+          >
+            {etaInfo.etaText}
+          </span>
+        </div>
+      ) : bus.status === 'OFFLINE' ? (
+        <div
+          style={{
+            fontSize: '0.75rem',
+            color: 'var(--gray-500)',
+            marginBottom: '8px',
+            fontStyle: 'italic'
+          }}
+        >
+          Shuttle is currently offline
+        </div>
+      ) : null}
+
       <div
         className="flex-between text-xs text-muted"
         style={{
           borderTop: '1px solid var(--gray-100)',
           paddingTop: '8px',
-          marginTop: '8px'
+          marginTop: '4px'
         }}
       >
         <span className="flex-row">
@@ -79,10 +143,17 @@ export default function BusCard({ bus, isSelected, onSelect }) {
           <span>{speed} km/h</span>
         </span>
 
-        <span className="flex-row">
-          <Clock size={14} />
-          <span>{lastUpdate}</span>
-        </span>
+        {etaInfo?.distanceText && etaInfo.distanceText !== '--' ? (
+          <span className="flex-row">
+            <MapPin size={14} />
+            <span>{etaInfo.distanceText} away</span>
+          </span>
+        ) : (
+          <span className="flex-row">
+            <Clock size={14} />
+            <span>{lastUpdate}</span>
+          </span>
+        )}
 
         <span className="flex-row">
           <Users size={14} />
