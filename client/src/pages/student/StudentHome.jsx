@@ -3,9 +3,10 @@ import MapView from '../../components/MapView';
 import BusCard from '../../components/BusCard';
 import Loader from '../../components/Loader';
 import ErrorState from '../../components/ErrorState';
-import { useBusLocations } from '../../hooks/useBusLocations';
+import { useBusLocations, FALLBACK_STOPS } from '../../hooks/useBusLocations';
 import { supabase } from '../../lib/supabaseClient';
-import { RefreshCw, Navigation, MapPin } from 'lucide-react';
+import { getBusETA } from '../../lib/eta';
+import { RefreshCw, Navigation, MapPin, Clock } from 'lucide-react';
 
 export default function StudentHome() {
   const {
@@ -15,7 +16,8 @@ export default function StudentHome() {
     refresh,
     selectedBusId,
     setSelectedBusId,
-    selectedBus
+    selectedBus,
+    getStopsForBus
   } = useBusLocations();
 
   const [stops, setStops] = useState([]);
@@ -25,12 +27,7 @@ export default function StudentHome() {
   useEffect(() => {
     async function loadStops() {
       if (!selectedBus?.route?.id) {
-        // Fallback default Delhi stops if not linked
-        setStops([
-          { id: '1', name: 'Campus Main Gate', lat: 28.6139, lng: 77.2090, seq: 1 },
-          { id: '2', name: 'Science & Tech Block', lat: 28.6185, lng: 77.2145, seq: 2 },
-          { id: '3', name: 'Central Library & Arts', lat: 28.6240, lng: 77.2210, seq: 3 }
-        ]);
+        setStops(FALLBACK_STOPS.default);
         return;
       }
 
@@ -43,24 +40,21 @@ export default function StudentHome() {
           .order('seq', { ascending: true });
 
         if (stopErr || !data || data.length === 0) {
-          // Fallback stops for North Loop
-          setStops([
-            { id: '1', name: 'Campus Main Gate', lat: 28.6139, lng: 77.2090, seq: 1 },
-            { id: '2', name: 'Science & Tech Block', lat: 28.6185, lng: 77.2145, seq: 2 },
-            { id: '3', name: 'Central Library & Arts', lat: 28.6240, lng: 77.2210, seq: 3 }
-          ]);
+          const isHostel = selectedBus.route.name?.toLowerCase().includes('hostel');
+          setStops(isHostel ? FALLBACK_STOPS.hostel : FALLBACK_STOPS.default);
         } else {
           setStops(data);
         }
       } catch (err) {
         console.warn('Error loading stops:', err);
+        setStops(FALLBACK_STOPS.default);
       } finally {
         setLoadingStops(false);
       }
     }
 
     loadStops();
-  }, [selectedBus?.route?.id]);
+  }, [selectedBus?.route?.id, selectedBus?.route?.name]);
 
   if (loading) {
     return <Loader message="Locating campus shuttles..." />;
@@ -72,6 +66,7 @@ export default function StudentHome() {
 
   const liveCount = buses.filter((b) => b.status === 'LIVE').length;
   const mockCount = buses.filter((b) => b.status === 'MOCK').length;
+  const selectedEta = selectedBus ? getBusETA(selectedBus, stops) : null;
 
   return (
     <div>
@@ -109,19 +104,39 @@ export default function StudentHome() {
           <div
             className="card mb-3"
             style={{
-              padding: '10px 14px',
+              padding: '12px 14px',
               backgroundColor: 'var(--blue-light)',
               border: '1px solid rgba(37, 99, 235, 0.2)'
             }}
           >
-            <div className="flex-between">
+            <div className="flex-between mb-1">
               <span className="flex-row" style={{ color: 'var(--blue)', fontWeight: 700, fontSize: '0.8125rem' }}>
                 <Navigation size={14} />
                 <span>Route: {selectedBus.route.name}</span>
               </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', fontWeight: 600 }}>
-                {stops.length} Stops
-              </span>
+
+              {selectedEta?.nextStop ? (
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: selectedEta.isArriving ? '#065f46' : '#1e40af',
+                    backgroundColor: selectedEta.isArriving ? '#d1fae5' : '#dbeafe',
+                    padding: '2px 8px',
+                    borderRadius: 'var(--radius-full)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Clock size={12} />
+                  <span>Next: {selectedEta.etaText}</span>
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: 'var(--gray-600)', fontWeight: 600 }}>
+                  {stops.length} Stops
+                </span>
+              )}
             </div>
 
             <div
@@ -129,30 +144,70 @@ export default function StudentHome() {
                 display: 'flex',
                 gap: '8px',
                 overflowX: 'auto',
-                paddingTop: '8px',
+                paddingTop: '6px',
                 scrollbarWidth: 'none'
               }}
             >
-              {stops.map((stop) => (
-                <div
-                  key={stop.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    backgroundColor: '#ffffff',
-                    padding: '4px 8px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '0.75rem',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                  }}
-                >
-                  <MapPin size={12} color="var(--blue)" />
-                  <span style={{ fontWeight: 600 }}>{stop.seq}.</span>
-                  <span>{stop.name}</span>
-                </div>
-              ))}
+              {stops.map((stop) => {
+                const isNext =
+                  selectedEta?.nextStop?.id === stop.id ||
+                  (selectedEta?.nextStop?.seq === stop.seq && selectedEta?.nextStop?.name === stop.name);
+
+                return (
+                  <div
+                    key={stop.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      backgroundColor: isNext
+                        ? selectedEta?.isArriving
+                          ? '#ecfdf5'
+                          : '#eff6ff'
+                        : '#ffffff',
+                      border: isNext
+                        ? `1.5px solid ${selectedEta?.isArriving ? 'var(--emerald)' : 'var(--blue)'}`
+                        : '1px solid var(--border-subtle)',
+                      padding: '5px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '0.75rem',
+                      whiteSpace: 'nowrap',
+                      boxShadow: isNext ? '0 0 0 2px var(--blue-glow)' : '0 1px 2px rgba(0,0,0,0.05)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <MapPin
+                      size={13}
+                      color={
+                        isNext
+                          ? selectedEta?.isArriving
+                            ? 'var(--emerald)'
+                            : 'var(--blue)'
+                          : 'var(--gray-500)'
+                      }
+                    />
+                    <span style={{ fontWeight: isNext ? 700 : 600 }}>
+                      {stop.seq}. {stop.name}
+                    </span>
+                    {isNext && (
+                      <span
+                        style={{
+                          backgroundColor: selectedEta?.isArriving ? 'var(--emerald)' : 'var(--blue)',
+                          color: '#ffffff',
+                          fontSize: '0.625rem',
+                          fontWeight: 800,
+                          padding: '1px 5px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase',
+                          marginLeft: '2px'
+                        }}
+                      >
+                        {selectedEta?.isArriving ? 'Here' : selectedEta?.etaText}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -163,6 +218,7 @@ export default function StudentHome() {
             <BusCard
               key={bus.id}
               bus={bus}
+              stops={getStopsForBus(bus)}
               isSelected={bus.id === selectedBusId}
               onSelect={(b) => setSelectedBusId(b.id)}
             />
