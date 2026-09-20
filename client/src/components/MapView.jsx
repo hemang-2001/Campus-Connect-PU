@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { getBusETA } from '../lib/eta';
 
 // Recenter map smoothly when selected bus changes
 function ChangeMapView({ center, zoom }) {
@@ -34,15 +35,15 @@ function createBusIcon(status = 'LIVE', heading = 0) {
   });
 }
 
-// Create custom DivIcon for Stops
-function createStopIcon(seq) {
+// Create custom DivIcon for Stops with optional Next-Stop highlight
+function createStopIcon(seq, isNext = false) {
   return L.divIcon({
     className: 'custom-stop-marker',
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
+    iconSize: isNext ? [30, 30] : [26, 26],
+    iconAnchor: isNext ? [15, 15] : [13, 13],
     popupAnchor: [0, -13],
     html: `
-      <div class="stop-marker-pin" style="width: 26px; height: 26px;">
+      <div class="stop-marker-pin ${isNext ? 'next-stop-pin' : ''}" style="width: ${isNext ? '30px' : '26px'}; height: ${isNext ? '30px' : '26px'};">
         ${seq || '•'}
       </div>
     `
@@ -56,6 +57,9 @@ export default function MapView({ buses = [], stops = [], selectedBus, onSelectB
   const mapCenter = selectedBus?.location?.lat && selectedBus?.location?.lng
     ? [selectedBus.location.lat, selectedBus.location.lng]
     : DEFAULT_CENTER;
+
+  // Compute selected bus ETA for stop markers
+  const selectedEta = selectedBus ? getBusETA(selectedBus, stops) : null;
 
   // Extract stops polyline coordinates if stops exist
   const stopCoordinates = stops && stops.length > 0
@@ -91,30 +95,53 @@ export default function MapView({ buses = [], stops = [], selectedBus, onSelectB
         )}
 
         {/* Bus Stop Markers */}
-        {stops.map((stop) => (
-          <Marker
-            key={stop.id || `${stop.lat}-${stop.lng}`}
-            position={[stop.lat, stop.lng]}
-            icon={createStopIcon(stop.seq)}
-          >
-            <Popup>
-              <div style={{ padding: '4px', textAlign: 'center' }}>
-                <strong style={{ display: 'block', fontSize: '13px', color: '#1e293b' }}>
-                  {stop.name}
-                </strong>
-                <span style={{ fontSize: '11px', color: '#64748b' }}>
-                  Stop #{stop.seq}
-                </span>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {stops.map((stop) => {
+          const isNextForSelected =
+            selectedEta?.nextStop?.id === stop.id ||
+            (selectedEta?.nextStop?.seq === stop.seq && selectedEta?.nextStop?.name === stop.name);
+
+          return (
+            <Marker
+              key={stop.id || `${stop.lat}-${stop.lng}`}
+              position={[stop.lat, stop.lng]}
+              icon={createStopIcon(stop.seq, isNextForSelected)}
+            >
+              <Popup>
+                <div style={{ padding: '4px', textAlign: 'center', minWidth: 120 }}>
+                  <strong style={{ display: 'block', fontSize: '13px', color: '#1e293b' }}>
+                    {stop.name}
+                  </strong>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                    Stop #{stop.seq}
+                  </span>
+                  {isNextForSelected && (
+                    <div
+                      style={{
+                        marginTop: '6px',
+                        padding: '3px 8px',
+                        backgroundColor: selectedEta.isArriving ? '#ecfdf5' : '#eff6ff',
+                        color: selectedEta.isArriving ? '#065f46' : '#1e40af',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        border: `1px solid ${selectedEta.isArriving ? '#a7f3d0' : '#bfdbfe'}`
+                      }}
+                    >
+                      Next arrival: {selectedEta.etaText}
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
 
         {/* Bus Markers */}
         {buses.map((bus) => {
           if (!bus.location?.lat || !bus.location?.lng) return null;
           const pos = [bus.location.lat, bus.location.lng];
           const icon = createBusIcon(bus.status, bus.location.heading);
+          const etaInfo = getBusETA(bus, stops);
 
           return (
             <Marker
@@ -126,17 +153,61 @@ export default function MapView({ buses = [], stops = [], selectedBus, onSelectB
               }}
             >
               <Popup>
-                <div style={{ minWidth: 140, padding: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ minWidth: 150, padding: 4 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 4
+                    }}
+                  >
                     <strong style={{ fontSize: 13 }}>{bus.plate_no}</strong>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: bus.status === 'LIVE' ? '#2563eb' : '#f59e0b' }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: bus.status === 'LIVE' ? '#2563eb' : '#f59e0b'
+                      }}
+                    >
                       {bus.status}
                     </span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#475569' }}>
-                    Route: {bus.route?.name || 'Campus Shuttle'}
+
+                  <div style={{ fontSize: 11, color: '#475569', marginBottom: 2 }}>
+                    Route: <strong>{bus.route?.name || 'Campus Shuttle'}</strong>
                   </div>
-                  <div style={{ fontSize: 11, color: '#475569' }}>
+
+                  {etaInfo?.nextStop && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        marginBottom: 4,
+                        padding: '4px 6px',
+                        background: etaInfo.isArriving ? '#ecfdf5' : '#eff6ff',
+                        borderRadius: 4,
+                        fontSize: 11,
+                        border: `1px solid ${
+                          etaInfo.isArriving ? '#a7f3d0' : '#bfdbfe'
+                        }`
+                      }}
+                    >
+                      <div style={{ color: '#1e293b', fontWeight: 600 }}>
+                        Next: {etaInfo.nextStop.name}
+                      </div>
+                      <div
+                        style={{
+                          color: etaInfo.isArriving ? '#059669' : '#2563eb',
+                          fontWeight: 700,
+                          fontSize: 10
+                        }}
+                      >
+                        ETA: {etaInfo.etaText} ({etaInfo.distanceText})
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
                     Speed: {bus.location.speed_kmh} km/h
                   </div>
                 </div>
