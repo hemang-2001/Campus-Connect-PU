@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, API_BASE } from '../../lib/supabaseClient';
 import Badge from '../../components/Badge';
+import { getBusETA } from '../../lib/eta';
 import {
   Radio,
   StopCircle,
@@ -13,7 +14,9 @@ import {
   WifiOff,
   Sun,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  MapPin,
+  Clock
 } from 'lucide-react';
 
 export default function DriverDashboard() {
@@ -22,6 +25,7 @@ export default function DriverDashboard() {
   // State
   const [buses, setBuses] = useState([]);
   const [selectedBusId, setSelectedBusId] = useState('');
+  const [driverStops, setDriverStops] = useState([]);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pointsSentCount, setPointsSentCount] = useState(0);
@@ -52,7 +56,7 @@ export default function DriverDashboard() {
         // Load active fleet directly from Supabase
         const { data: busData } = await supabase
           .from('buses')
-          .select('id, plate_no, capacity, route:routes(name)')
+          .select('id, plate_no, capacity, route:routes(id, name)')
           .eq('is_active', true);
 
         if (busData && busData.length > 0) {
@@ -82,6 +86,31 @@ export default function DriverDashboard() {
 
     loadInitialData();
   }, [session]);
+
+  // Load route stops for the selected bus to compute live ETA
+  useEffect(() => {
+    async function loadDriverStops() {
+      const chosenBus = buses.find((b) => b.id === selectedBusId);
+      if (!chosenBus?.route?.id) {
+        setDriverStops([]);
+        return;
+      }
+      try {
+        const { data, error: stopErr } = await supabase
+          .from('bus_stops')
+          .select('*')
+          .eq('route_id', chosenBus.route.id)
+          .order('seq', { ascending: true });
+
+        if (!stopErr && data) {
+          setDriverStops(data);
+        }
+      } catch (err) {
+        console.warn('Error loading driver stops:', err);
+      }
+    }
+    loadDriverStops();
+  }, [selectedBusId, buses]);
 
   // Request and manage Screen Wake Lock (Step 3)
   const requestWakeLock = async () => {
@@ -352,6 +381,20 @@ export default function DriverDashboard() {
   }, []);
 
   const selectedBus = buses.find((b) => b.id === selectedBusId);
+  const driverEta =
+    isBroadcasting && currentCoords && selectedBus
+      ? getBusETA(
+          {
+            location: {
+              lat: currentCoords.lat,
+              lng: currentCoords.lng,
+              speed_kmh: currentSpeedKmh
+            },
+            status: 'LIVE'
+          },
+          driverStops
+        )
+      : null;
 
   return (
     <div style={{ padding: '16px 0' }}>
@@ -438,10 +481,10 @@ export default function DriverDashboard() {
             type="button"
             className="btn btn-primary btn-full btn-lg mt-2"
             onClick={startBroadcasting}
-            disabled={!selectedBusId}
+            disabled={!selectedBusId || buses.length === 0}
           >
             <PlayCircle size={20} />
-            <span>Start Sending My Location</span>
+            <span>Start Live GPS Broadcast</span>
           </button>
         ) : (
           <button
@@ -457,6 +500,83 @@ export default function DriverDashboard() {
 
       {/* Telemetry & Metrics Dashboard */}
       <div className="card">
+        {/* Next Stop & ETA readout for active driver */}
+        {isBroadcasting && driverEta?.nextStop && (
+          <div
+            style={{
+              backgroundColor: driverEta.isArriving ? 'var(--emerald-light)' : 'var(--blue-light)',
+              border: `1.5px solid ${driverEta.isArriving ? 'var(--emerald)' : 'var(--blue)'}`,
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: driverEta.isArriving ? 'var(--emerald)' : 'var(--blue)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <MapPin size={18} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <span
+                  className="text-xs text-muted"
+                  style={{ display: 'block', fontWeight: 700, textTransform: 'uppercase' }}
+                >
+                  Next Stop
+                </span>
+                <strong
+                  style={{
+                    fontSize: '0.9375rem',
+                    color: 'var(--text-primary)',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {driverEta.nextStop.name}
+                </strong>
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: driverEta.isArriving ? 'var(--emerald)' : 'var(--blue)',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.8125rem',
+                  padding: '4px 10px',
+                  borderRadius: 'var(--radius-full)'
+                }}
+              >
+                <Clock size={12} />
+                <span>{driverEta.etaText}</span>
+              </span>
+              <span className="text-xs text-muted" style={{ display: 'block', marginTop: '3px' }}>
+                {driverEta.distanceText} away
+              </span>
+            </div>
+          </div>
+        )}
+
         <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: '14px' }}>
           Live Telemetry Stream
         </h3>
