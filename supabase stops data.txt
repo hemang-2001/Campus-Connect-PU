@@ -11,7 +11,7 @@ INSERT INTO public.routes (id, name, color, is_active)
 VALUES (
   'a1b2c3d4-0000-4000-8000-000000000002'::UUID,
   'Route 2 SJ Campus - Library',
-  '#8e7cc3',
+  '#b73eefff',
   true
 )
 

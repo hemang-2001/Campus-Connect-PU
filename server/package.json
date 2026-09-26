@@ -16,7 +16,16 @@
     "express": "^4.18.3",
     "helmet": "^7.1.0"
   },
-  "keywords": ["campus-connect", "shuttle", "tracker", "supabase", "express"],
+  "keywords": [
+    "campus-connect",
+    "shuttle",
+    "tracker",
+    "supabase",
+    "express"
+  ],
   "author": "Campus Connect Team",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "docx": "^9.7.1"
+  }
 }
