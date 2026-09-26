@@ -2,6 +2,12 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 
 const SAMPLE_USERS = [
   {
+    email: 'hamang2001@gmail.com',
+    fullName: 'Hemang Bairwa (Lead Admin)',
+    role: 'admin',
+    phone: '+91 93198 24831'
+  },
+  {
     email: 'admin@campus.edu',
     password: 'admin123',
     fullName: 'Dr. Sarah Connor (Admin)',

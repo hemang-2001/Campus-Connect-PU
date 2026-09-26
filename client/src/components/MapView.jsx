@@ -53,13 +53,23 @@ function createStopIcon(seq, isNext = false) {
 const DEFAULT_CENTER = [28.6139, 77.2090]; // Delhi Campus Coordinates
 
 export default function MapView({ buses = [], stops = [], selectedBus, onSelectBus }) {
-  // Determine center from selected bus or fallback
-  const mapCenter = selectedBus?.location?.lat && selectedBus?.location?.lng
-    ? [selectedBus.location.lat, selectedBus.location.lng]
+  // Filter out offline buses from the map for a cleaner look
+  const visibleBuses = buses.filter(
+    (bus) => bus.status && bus.status.toUpperCase() !== 'OFFLINE'
+  );
+
+  const isSelectedActive = Boolean(
+    selectedBus && selectedBus.status && selectedBus.status.toUpperCase() !== 'OFFLINE'
+  );
+  const targetBus = isSelectedActive ? selectedBus : (visibleBuses[0] || null);
+
+  // Determine center from selected active bus, first visible bus, or fallback
+  const mapCenter = targetBus?.location?.lat && targetBus?.location?.lng
+    ? [targetBus.location.lat, targetBus.location.lng]
     : DEFAULT_CENTER;
 
-  // Compute selected bus ETA for stop markers
-  const selectedEta = selectedBus ? getBusETA(selectedBus, stops) : null;
+  // Compute selected bus ETA for stop markers only if selected bus is active
+  const selectedEta = isSelectedActive ? getBusETA(selectedBus, stops) : null;
 
   // Extract stops polyline coordinates if stops exist
   const stopCoordinates = stops && stops.length > 0
@@ -136,8 +146,8 @@ export default function MapView({ buses = [], stops = [], selectedBus, onSelectB
           );
         })}
 
-        {/* Bus Markers */}
-        {buses.map((bus) => {
+        {/* Bus Markers (Offline buses excluded for cleaner look) */}
+        {visibleBuses.map((bus) => {
           if (!bus.location?.lat || !bus.location?.lng) return null;
           const pos = [bus.location.lat, bus.location.lng];
           const icon = createBusIcon(bus.status, bus.location.heading);

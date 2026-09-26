@@ -75,7 +75,8 @@ export function useBusLocations() {
       const data = await res.json();
       setBuses(data.buses || []);
       if (!selectedBusId && data.buses && data.buses.length > 0) {
-        setSelectedBusId(data.buses[0].id);
+        const firstActive = data.buses.find((b) => b.status && b.status.toUpperCase() !== 'OFFLINE');
+        setSelectedBusId(firstActive ? firstActive.id : data.buses[0].id);
       }
     } catch (err) {
       console.error('Error in useBusLocations fetch:', err);
