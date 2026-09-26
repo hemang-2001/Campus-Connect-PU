@@ -4,7 +4,7 @@ import { supabase, API_BASE } from '../../lib/supabaseClient';
 import Badge from '../../components/Badge';
 import Loader from '../../components/Loader';
 import EmptyState from '../../components/EmptyState';
-import { MessageSquare, User, Phone, CheckCircle, Save, Filter, RefreshCw } from 'lucide-react';
+import { MessageSquare, User, Phone, Mail, CheckCircle, Save, Filter, RefreshCw } from 'lucide-react';
 
 export default function ComplaintsAdmin() {
   const { session } = useAuth();
@@ -254,6 +254,12 @@ export default function ComplaintsAdmin() {
                 {c.student?.registration_no && (
                   <span style={{ fontWeight: 600 }}>
                     Reg: {c.student.registration_no}
+                  </span>
+                )}
+                {(c.student?.mail_id || c.student?.email) && (
+                  <span className="flex-row">
+                    <Mail size={14} color="var(--gray-500)" />
+                    <span>{c.student.mail_id || c.student.email}</span>
                   </span>
                 )}
                 {c.student?.phone && (

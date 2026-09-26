@@ -7,6 +7,7 @@ import trackingRoutes from './routes/tracking.js';
 import complaintsRoutes from './routes/complaints.js';
 import alertsRoutes from './routes/alerts.js';
 import profileRoutes from './routes/profile.js';
+import authRoutes from './routes/auth.js';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use('/api/tracking', trackingRoutes);
 app.use('/api/complaints', complaintsRoutes);
 app.use('/api/alerts', alertsRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/auth', authRoutes);
 
 // 4. 404 handler
 app.use((req, res) => {

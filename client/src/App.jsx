@@ -23,10 +23,12 @@ import { ShieldAlert, ArrowLeft } from 'lucide-react';
  * Enforces authenticated session & authorized role list.
  */
 function Protected({ allowedRoles, children }) {
-  const { session, role, loading } = useAuth();
+  const { session, role, loading, profile } = useAuth();
 
-  if (loading) {
-    return <Loader message="Checking authentication status..." />;
+  // If auth is loading OR session is present but profile is still resolving,
+  // hold with a loader instead of prematurely assuming role = 'student' and kicking user out!
+  if (loading || (session && !profile && (!role || role === 'student'))) {
+    return <Loader message="Verifying campus credentials..." />;
   }
 
   if (!session) {
@@ -35,24 +37,27 @@ function Protected({ allowedRoles, children }) {
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     const fallbackHome = role === 'driver' ? '/driver' : role === 'admin' ? '/admin' : '/';
-
-    return (
-      <div className="state-container" style={{ padding: '60px 20px' }}>
-        <div style={{ color: 'var(--rose)', marginBottom: '12px' }}>
-          <ShieldAlert size={48} />
-        </div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Unauthorized for your role</h2>
-        <p className="text-sm text-muted" style={{ maxWidth: 320 }}>
-          Your current account role (<strong>{role}</strong>) does not have permission to access this section.
-        </p>
-        <Link to={fallbackHome} className="btn btn-primary mt-4">
-          <ArrowLeft size={16} /> Return to your Dashboard
-        </Link>
-      </div>
-    );
+    return <Navigate to={fallbackHome} replace />;
   }
 
   return children;
+}
+
+/**
+ * RoleHome Dispatcher
+ * Sends drivers to /driver, admins to /admin, and students to StudentHome
+ */
+function RoleHome() {
+  const { role, session, loading, profile } = useAuth();
+
+  // Wait until profile is fully resolved before deciding which dashboard to display
+  if (loading || (session && !profile && (!role || role === 'student'))) {
+    return <Loader message="Routing to your dashboard..." />;
+  }
+
+  if (role === 'driver') return <Navigate to="/driver" replace />;
+  if (role === 'admin') return <Navigate to="/admin" replace />;
+  return <StudentHome />;
 }
 
 export default function App() {
@@ -71,15 +76,8 @@ export default function App() {
             </Protected>
           }
         >
-          {/* Student Routes */}
-          <Route
-            path="/"
-            element={
-              <Protected allowedRoles={['student']}>
-                <StudentHome />
-              </Protected>
-            }
-          />
+          {/* Smart Root Route */}
+          <Route path="/" element={<RoleHome />} />
           <Route
             path="/complaints"
             element={

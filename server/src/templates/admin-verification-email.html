@@ -69,35 +69,20 @@
           A request has been initiated to sign in with elevated permissions (<strong>Administrator Console</strong> or <strong>Driver Broadcast Terminal</strong>) on Campus Connect PU.
         </p>
 
-        <!-- OTP Code Box -->
-        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0;">
-          <tr>
-            <td style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center;">
-              <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px;">
-                Your 6-Digit Confirmation Code
-              </span>
-              <span style="font-family: 'SF Mono', Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 32px; font-weight: 800; color: #2563eb; letter-spacing: 6px; display: block;">
-                {{ .Token }}
-              </span>
-              <span style="font-size: 11px; color: #94a3b8; display: block; margin-top: 6px;">
-                Enter this code in the login verification box
-              </span>
-            </td>
-          </tr>
-        </table>
-
-        <!-- Single-Click CTA Button -->
+        <!-- Instant Sign In CTA Button -->
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 28px 0 24px;">
           <tr>
             <td align="center">
-              <a href="{{ .ConfirmationURL }}" target="_blank" style="background-color: #2563eb; color: #ffffff; display: inline-block; padding: 14px 32px; border-radius: 10px; font-size: 15px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35); text-align: center; mso-padding-alt: 0;">
-                <!--[if mso]><i style="letter-spacing: 32px; mso-font-width: -100%;" hidden>&nbsp;</i><![endif]-->
-                <span style="mso-text-raise: 15pt;">Authorize & Sign In Directly &rarr;</span>
-                <!--[if mso]><i style="letter-spacing: 32px; mso-font-width: -100%" hidden>&nbsp;</i><![endif]-->
+              <a href="{{ .ConfirmationURL }}" target="_blank" style="background-color: #2563eb; color: #ffffff; display: inline-block; padding: 16px 36px; border-radius: 10px; font-size: 16px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4); text-align: center; mso-padding-alt: 0;">
+                <!--[if mso]><i style="letter-spacing: 36px; mso-font-width: -100%;" hidden>&nbsp;</i><![endif]-->
+                <span style="mso-text-raise: 15pt;">Authorize & Sign In to Dashboard &rarr;</span>
+                <!--[if mso]><i style="letter-spacing: 36px; mso-font-width: -100%" hidden>&nbsp;</i><![endif]-->
               </a>
             </td>
           </tr>
         </table>
+
+
 
         <!-- Security Notice -->
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 20px;">

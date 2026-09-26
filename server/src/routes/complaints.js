@@ -24,7 +24,7 @@ router.get('/', requireAuth, async (req, res) => {
         status,
         admin_note,
         created_at,
-        student:profiles(id, full_name, registration_no, phone, avatar_url)
+        student:profiles(id, email, mail_id, full_name, registration_no, phone, avatar_url)
       `)
       .order('created_at', { ascending: false });
 
@@ -146,7 +146,7 @@ router.patch('/:id', requireAuth, requireRole('admin'), async (req, res) => {
         status,
         admin_note,
         created_at,
-        student:profiles(id, full_name, registration_no, phone)
+        student:profiles(id, email, mail_id, full_name, registration_no, phone)
       `)
       .single();
 

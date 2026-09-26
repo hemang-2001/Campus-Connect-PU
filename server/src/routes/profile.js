@@ -13,7 +13,7 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, registration_no, phone, avatar_url, created_at')
+      .select('id, email, mail_id, full_name, role, registration_no, phone, avatar_url, created_at')
       .eq('id', req.user.id)
       .maybeSingle();
 
@@ -57,7 +57,7 @@ router.patch('/me', requireAuth, async (req, res) => {
       .from('profiles')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id, full_name, role, registration_no, phone, avatar_url, created_at')
+      .select('id, email, mail_id, full_name, role, registration_no, phone, avatar_url, created_at')
       .single();
 
     if (error) {
@@ -107,7 +107,7 @@ router.patch('/registration', requireAuth, requireRole('student'), async (req, r
       .from('profiles')
       .update({ registration_no: cleanedRegNo })
       .eq('id', req.user.id)
-      .select('id, full_name, role, registration_no, phone, avatar_url, created_at')
+      .select('id, email, mail_id, full_name, role, registration_no, phone, avatar_url, created_at')
       .single();
 
     if (updateErr) {

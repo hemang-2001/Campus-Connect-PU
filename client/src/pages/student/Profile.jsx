@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE } from '../../lib/supabaseClient';
-import { User, Phone, BookOpen, Mail, Shield, CheckCircle, AlertCircle, Save } from 'lucide-react';
+import { User, Phone, BookOpen, Mail, Shield, CheckCircle, AlertCircle, Save, Trash2 } from 'lucide-react';
 
 export default function Profile() {
-  const { session, profile, role, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+  const { session, profile, role, refreshProfile, signOut } = useAuth();
 
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -12,6 +14,30 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  const handleDeleteMyAccount = async () => {
+    if (!window.confirm('Are you sure you want to permanently delete your account? All your account details will be purged from both the database and auth system so you can recreate it anytime.')) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      });
+      if (res.ok) {
+        if (signOut) await signOut();
+        navigate('/login', { replace: true });
+      } else {
+        const d = await res.json();
+        setErrorMsg(d.error || 'Failed to delete account');
+      }
+    } catch (err) {
+      setErrorMsg('Error deleting account');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -123,7 +149,7 @@ export default function Profile() {
                 id="profile-email"
                 type="email"
                 className="form-input"
-                value={session?.user?.email || ''}
+                value={profile?.mail_id || profile?.email || session?.user?.email || ''}
                 disabled
               />
             </div>
@@ -183,6 +209,22 @@ export default function Profile() {
             <span>{saving ? 'Saving changes...' : 'Save Profile'}</span>
           </button>
         </form>
+
+        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--gray-200)', textAlign: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ color: 'var(--rose)', borderColor: 'var(--rose)', fontSize: '0.8125rem' }}
+            disabled={saving}
+            onClick={handleDeleteMyAccount}
+          >
+            <Trash2 size={15} />
+            <span>Delete My Account Permanently</span>
+          </button>
+          <p className="text-xs text-muted" style={{ marginTop: '6px' }}>
+            Purges your account from database and auth so you can re-register anytime.
+          </p>
+        </div>
       </div>
     </div>
   );

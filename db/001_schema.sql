@@ -11,6 +11,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 2. Profiles Table (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT,
+  mail_id TEXT,
   full_name TEXT,
   role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'driver', 'admin')),
   registration_no TEXT UNIQUE,
@@ -116,15 +118,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $fn$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, role, phone, registration_no)
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, phone, registration_no)
   VALUES (
     new.id,
+    new.email,
+    new.email,
     COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
     COALESCE(new.raw_user_meta_data->>'role', 'student'),
     COALESCE(new.raw_user_meta_data->>'phone', NULL),
     COALESCE(new.raw_user_meta_data->>'registration_no', NULL)
   )
   ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    mail_id = EXCLUDED.mail_id,
     full_name = EXCLUDED.full_name,
     phone = COALESCE(public.profiles.phone, EXCLUDED.phone),
     registration_no = COALESCE(public.profiles.registration_no, EXCLUDED.registration_no);

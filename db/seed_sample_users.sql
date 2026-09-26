@@ -36,9 +36,9 @@ BEGIN
     now()
   );
 
-  INSERT INTO public.profiles (id, full_name, role, phone)
-  VALUES (v_admin_id, 'Dr. Sarah Connor (Admin)', 'admin', '+91 98765 99999')
-  ON CONFLICT (id) DO UPDATE SET role = 'admin', full_name = EXCLUDED.full_name;
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, phone)
+  VALUES (v_admin_id, 'admin@campus.edu', 'admin@campus.edu', 'Dr. Sarah Connor (Admin)', 'admin', '+91 98765 99999')
+  ON CONFLICT (id) DO UPDATE SET role = 'admin', full_name = EXCLUDED.full_name, email = EXCLUDED.email, mail_id = EXCLUDED.mail_id;
 
   -- 2. Insert Bus Driver
   INSERT INTO auth.users (
@@ -59,9 +59,9 @@ BEGIN
     now()
   );
 
-  INSERT INTO public.profiles (id, full_name, role, phone)
-  VALUES (v_driver_id, 'Rajesh Kumar (Driver)', 'driver', '+91 98765 12345')
-  ON CONFLICT (id) DO UPDATE SET role = 'driver', full_name = EXCLUDED.full_name;
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, phone)
+  VALUES (v_driver_id, 'driver@campus.edu', 'driver@campus.edu', 'Rajesh Kumar (Driver)', 'driver', '+91 98765 12345')
+  ON CONFLICT (id) DO UPDATE SET role = 'driver', full_name = EXCLUDED.full_name, email = EXCLUDED.email, mail_id = EXCLUDED.mail_id;
 
   -- 3. Insert Student
   INSERT INTO auth.users (
@@ -82,8 +82,8 @@ BEGIN
     now()
   );
 
-  INSERT INTO public.profiles (id, full_name, role, registration_no, phone)
-  VALUES (v_student_id, 'Alex Johnson (Student)', 'student', 'CS202401', '+91 98765 43210')
-  ON CONFLICT (id) DO UPDATE SET role = 'student', full_name = EXCLUDED.full_name;
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, registration_no, phone)
+  VALUES (v_student_id, 'student@campus.edu', 'student@campus.edu', 'Alex Johnson (Student)', 'student', 'CS202401', '+91 98765 43210')
+  ON CONFLICT (id) DO UPDATE SET role = 'student', full_name = EXCLUDED.full_name, email = EXCLUDED.email, mail_id = EXCLUDED.mail_id;
 
 END $$;

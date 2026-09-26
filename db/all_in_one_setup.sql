@@ -10,6 +10,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 2. SCHEMA TABLES
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT,
+  mail_id TEXT,
   full_name TEXT,
   role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'driver', 'admin')),
   registration_no TEXT UNIQUE,
@@ -106,15 +108,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $fn$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, role, phone, registration_no)
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, phone, registration_no)
   VALUES (
     new.id,
+    new.email,
+    new.email,
     COALESCE(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
     COALESCE(new.raw_user_meta_data->>'role', 'student'),
     COALESCE(new.raw_user_meta_data->>'phone', NULL),
     COALESCE(new.raw_user_meta_data->>'registration_no', NULL)
   )
   ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    mail_id = EXCLUDED.mail_id,
     full_name = EXCLUDED.full_name,
     phone = COALESCE(public.profiles.phone, EXCLUDED.phone),
     registration_no = COALESCE(public.profiles.registration_no, EXCLUDED.registration_no);
@@ -126,6 +132,23 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Trigger: Automatically delete from auth.users when profile is deleted
+CREATE OR REPLACE FUNCTION public.sync_profile_deletion_to_auth()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  DELETE FROM auth.users WHERE id = OLD.id;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_profile_deleted ON public.profiles;
+CREATE TRIGGER on_profile_deleted
+  AFTER DELETE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.sync_profile_deletion_to_auth();
 
 -- 4. ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -312,9 +335,9 @@ BEGIN
     now()
   );
 
-  INSERT INTO public.profiles (id, full_name, role, phone)
-  VALUES (v_admin_id, 'Dr. Sarah Connor (Admin)', 'admin', '+91 98765 99999')
-  ON CONFLICT (id) DO UPDATE SET role = 'admin', full_name = EXCLUDED.full_name;
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, phone)
+  VALUES (v_admin_id, 'admin@campus.edu', 'admin@campus.edu', 'Dr. Sarah Connor (Admin)', 'admin', '+91 98765 99999')
+  ON CONFLICT (id) DO UPDATE SET role = 'admin', full_name = EXCLUDED.full_name, email = EXCLUDED.email, mail_id = EXCLUDED.mail_id;
 
   -- 2. Insert Bus Driver (driver@campus.edu / driver123)
   INSERT INTO auth.users (
@@ -335,9 +358,9 @@ BEGIN
     now()
   );
 
-  INSERT INTO public.profiles (id, full_name, role, phone)
-  VALUES (v_driver_id, 'Rajesh Kumar (Driver)', 'driver', '+91 98765 12345')
-  ON CONFLICT (id) DO UPDATE SET role = 'driver', full_name = EXCLUDED.full_name;
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, phone)
+  VALUES (v_driver_id, 'driver@campus.edu', 'driver@campus.edu', 'Rajesh Kumar (Driver)', 'driver', '+91 98765 12345')
+  ON CONFLICT (id) DO UPDATE SET role = 'driver', full_name = EXCLUDED.full_name, email = EXCLUDED.email, mail_id = EXCLUDED.mail_id;
 
   -- 3. Insert Student (student@campus.edu / student123)
   INSERT INTO auth.users (
@@ -358,8 +381,8 @@ BEGIN
     now()
   );
 
-  INSERT INTO public.profiles (id, full_name, role, registration_no, phone)
-  VALUES (v_student_id, 'Alex Johnson (Student)', 'student', 'CS202401', '+91 98765 43210')
-  ON CONFLICT (id) DO UPDATE SET role = 'student', full_name = EXCLUDED.full_name;
+  INSERT INTO public.profiles (id, email, mail_id, full_name, role, registration_no, phone)
+  VALUES (v_student_id, 'student@campus.edu', 'student@campus.edu', 'Alex Johnson (Student)', 'student', 'CS202401', '+91 98765 43210')
+  ON CONFLICT (id) DO UPDATE SET role = 'student', full_name = EXCLUDED.full_name, email = EXCLUDED.email, mail_id = EXCLUDED.mail_id;
 
 END $$;

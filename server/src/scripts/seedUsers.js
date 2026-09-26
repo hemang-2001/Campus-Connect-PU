@@ -82,6 +82,8 @@ async function seed() {
           .from('profiles')
           .upsert({
             id: userId,
+            email: u.email,
+            mail_id: u.email,
             full_name: u.fullName,
             role: u.role,
             phone: u.phone,
