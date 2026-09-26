@@ -78,7 +78,7 @@ campus-connect/
 3. Execute the SQL files in order:
    - Run `db/001_schema.sql` (Creates extensions, schema tables, functions, and user trigger).
    - Run `db/002_rls.sql` (Enables and configures RLS on all 8 tables).
-   - Run `db/003_seed.sql` (Populates Delhi campus routes, stops, buses, and initial location).
+   - Run `db/003_seed.sql` (Populates campus routes, stops, buses, and initial location).
 4. **Enable Email Authentication**:
    - Go to **Authentication -> Providers -> Email**.
    - Make sure **Enable Email provider** is turned on.
@@ -209,5 +209,5 @@ The driver tracking cockpit uses the phone's native GPS and screen wake lock:
 - [ ] Verify `GET /health` on Express returns `{ "status": "ok" }`.
 - [ ] Ensure Supabase Realtime publication includes `bus_locations`.
 - [ ] Confirm RLS is enabled on all 8 tables in `db/002_rls.sql`.
-- [ ] Test Geolocation watch & Wake Lock on mobile device over HTTPS.
+- [ ] Test Geolocation watch & Wake Lock on a mobile device over HTTPS.
 - [ ] Submit a test complaint as a student and confirm the admin can view and update its resolution status.
