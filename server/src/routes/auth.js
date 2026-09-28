@@ -2,6 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { isRegNo } from '../utils/validate.js';
 
 const router = Router();
 const ADMIN_EMAIL = 'hamang2001@gmail.com';
@@ -170,9 +171,15 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Check registration number uniqueness in database for students
+    // Check registration number uniqueness and format in database for students
     if (registrationNo && userRole === 'student') {
       const cleanReg = registrationNo.trim().toUpperCase();
+      if (!isRegNo(cleanReg)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Registration number must be up to 14 letters or numbers (e.g. 286MTCSEPY0005, CS202401).'
+        });
+      }
       const { data: existingReg } = await supabaseAdmin
         .from('profiles')
         .select('id')

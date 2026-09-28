@@ -27,3 +27,9 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Handover and confidential notes
+.handover.md
+*.handover.md
+handover.md
+

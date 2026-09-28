@@ -78,16 +78,16 @@ router.patch('/me', requireAuth, async (req, res) => {
 /**
  * PATCH /api/profile/registration
  * Student only: Updates university registration number.
- * Validates against format /^[A-Z]{2,4}\d{4,8}$/
+ * Validates against format /^[A-Za-z0-9]{1,14}$/
  */
 router.patch('/registration', requireAuth, requireRole('student'), async (req, res) => {
   try {
     const { registrationNo } = req.body;
-    const cleanedRegNo = clean(registrationNo, 20).toUpperCase();
+    const cleanedRegNo = clean(registrationNo, 14).toUpperCase();
 
     if (!isRegNo(cleanedRegNo)) {
       return res.status(400).json({
-        error: 'Invalid registration number format. Expected 2-4 uppercase letters followed by 4-8 digits (e.g. CS202401, EN1029384).'
+        error: 'Invalid registration number format. Expected up to 14 letters or numbers (e.g. 286MTCSEPY0005, CS202401).'
       });
     }
 

@@ -15,13 +15,13 @@ export function isEmail(email) {
 
 /**
  * Validates university student registration number
- * Pattern: 2 to 4 uppercase letters followed by 4 to 8 digits (e.g., CS202401, EN1029384)
+ * Pattern: Up to 14 alphanumeric characters (letters and numbers, e.g. 286MTCSEPY0005, CS202401)
  * @param {string} regNo 
  * @returns {boolean}
  */
 export function isRegNo(regNo) {
   if (typeof regNo !== 'string') return false;
-  const re = /^[A-Z]{2,4}\d{4,8}$/;
+  const re = /^[A-Za-z0-9]{1,14}$/;
   return re.test(regNo.trim());
 }
 

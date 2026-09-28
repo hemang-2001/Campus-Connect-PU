@@ -31,9 +31,9 @@ export default function Register() {
     }
 
     if (role === 'student' && registrationNo) {
-      const regRegex = /^[A-Z]{2,4}\d{4,8}$/;
+      const regRegex = /^[A-Z0-9]{1,14}$/;
       if (!regRegex.test(registrationNo.trim().toUpperCase())) {
-        setErrorMsg('Registration number must format as 2-4 uppercase letters + 4-8 digits (e.g. CS202401)');
+        setErrorMsg('Registration number must be up to 14 letters or numbers (e.g. 286MTCSEPY0005, CS202401)');
         return;
       }
     }
@@ -202,11 +202,12 @@ export default function Register() {
                   id="reg-regno"
                   type="text"
                   className="form-input"
-                  placeholder="CS202401"
+                  maxLength={14}
+                  placeholder="e.g. 286MTCSEPY0005 or CS202401"
                   value={registrationNo}
                   onChange={(e) => setRegistrationNo(e.target.value.toUpperCase())}
                 />
-                <span className="form-hint">e.g. CS202401, EN102938</span>
+                <span className="form-hint">Up to 14 letters or numbers (e.g. 286MTCSEPY0005, CS202401)</span>
               </div>
             )}
 

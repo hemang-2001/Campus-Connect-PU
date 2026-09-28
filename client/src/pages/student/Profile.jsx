@@ -74,6 +74,11 @@ export default function Profile() {
 
       // 2. If student and registration number changed, update registration
       if (role === 'student' && registrationNo && registrationNo !== profile?.registration_no) {
+        const regRegex = /^[A-Z0-9]{1,14}$/;
+        if (!regRegex.test(registrationNo.trim().toUpperCase())) {
+          throw new Error('Registration number must be up to 14 letters or numbers (e.g. 26MTCSEPY0005, CS202401)');
+        }
+
         const resReg = await fetch(`${API_BASE}/api/profile/registration`, {
           method: 'PATCH',
           headers: {
@@ -178,11 +183,12 @@ export default function Profile() {
                 id="profile-regno"
                 type="text"
                 className="form-input"
+                maxLength={14}
                 value={registrationNo}
-                placeholder="e.g. CS202401"
+                placeholder="e.g. 286MTCSEPY0005 or CS202401"
                 onChange={(e) => setRegistrationNo(e.target.value.toUpperCase())}
               />
-              <span className="form-hint">Pattern: 2-4 uppercase letters + 4-8 digits</span>
+              <span className="form-hint">Up to 14 letters or numbers (e.g. 286MTCSEPY0005, CS202401)</span>
             </div>
           )}
 
