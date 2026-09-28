@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch full profile details from the Express backend with direct Supabase fallback
+  // Fetch full profile details from the Express backend with direct Supabase and metadata fallback
   const fetchProfile = useCallback(async (token, userObj = null) => {
     if (!token) {
       setProfile(null);
@@ -17,14 +17,32 @@ export function AuthProvider({ children }) {
     }
 
     let loadedProfile = null;
+    let activeUser = userObj;
 
-    // 1. Try Express API
+    if (!activeUser) {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        activeUser = userData?.user ?? null;
+      } catch (err) {
+        console.warn('Failed to resolve active user for profile:', err);
+      }
+    }
+
+    const activeUserId = activeUser?.id;
+
+    // 1. Try Express API with a strict 3.5s timeout via AbortController
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
       const res = await fetch(`${API_BASE}/api/profile/me`, {
         headers: {
           Authorization: `Bearer ${token}`
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+
       if (res.ok) {
         const data = await res.json();
         if (data.profile) {
@@ -32,34 +50,65 @@ export function AuthProvider({ children }) {
         }
       }
     } catch (err) {
-      console.warn('API profile fetch notice:', err.message);
+      console.warn('API profile fetch notice (using fallback):', err.message);
     }
 
     // 2. Direct Supabase database fallback if Express didn't return
-    if (!loadedProfile) {
+    if (!loadedProfile && activeUserId) {
       try {
-        const activeUserId = userObj?.id || user?.id || (await supabase.auth.getUser()).data?.user?.id;
-        if (activeUserId) {
-          const { data: dbProf } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', activeUserId)
-            .maybeSingle();
+        const { data: dbProf, error: dbErr } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', activeUserId)
+          .maybeSingle();
 
-          if (dbProf) {
-            loadedProfile = dbProf;
-          }
+        if (dbProf) {
+          loadedProfile = dbProf;
+        } else if (dbErr) {
+          console.warn('Direct Supabase profile notice:', dbErr.message);
         }
       } catch (fallbackErr) {
         console.warn('Direct Supabase profile fallback notice:', fallbackErr.message);
       }
     }
 
+    // 3. Fallback: synthesize profile from Supabase Auth user metadata so profile is never stuck at null
+    if (!loadedProfile && activeUser) {
+      const isLeadAdmin = activeUser.email?.toLowerCase() === 'hamang2001@gmail.com';
+      const metaRole = isLeadAdmin ? 'admin' : (activeUser.user_metadata?.role || 'student');
+      loadedProfile = {
+        id: activeUser.id,
+        email: activeUser.email,
+        mail_id: activeUser.email,
+        full_name: activeUser.user_metadata?.full_name || activeUser.email?.split('@')[0] || 'User',
+        role: metaRole,
+        registration_no: activeUser.user_metadata?.registration_no || null,
+        phone: activeUser.user_metadata?.phone || null,
+        avatar_url: activeUser.user_metadata?.avatar_url || null,
+        is_approved: isLeadAdmin || activeUser.user_metadata?.is_approved !== false
+      };
+
+      // Best-effort background sync into profiles table
+      supabase
+        .from('profiles')
+        .upsert({
+          id: loadedProfile.id,
+          email: loadedProfile.email,
+          mail_id: loadedProfile.mail_id,
+          full_name: loadedProfile.full_name,
+          role: loadedProfile.role,
+          registration_no: loadedProfile.registration_no,
+          phone: loadedProfile.phone
+        })
+        .then(() => {})
+        .catch(() => {});
+    }
+
     if (loadedProfile) {
       setProfile(loadedProfile);
     }
     return loadedProfile;
-  }, [user]);
+  }, []);
 
   const refreshProfile = useCallback(async () => {
     if (session?.access_token) {
@@ -106,8 +155,16 @@ export function AuthProvider({ children }) {
       if (mounted) setLoading(false);
     });
 
+    // Hard safety timeout: Ensure auth loading screen never hangs for more than 4 seconds
+    const safetyTimer = setTimeout(() => {
+      if (mounted) {
+        setLoading(false);
+      }
+    }, 4000);
+
     return () => {
       mounted = false;
+      clearTimeout(safetyTimer);
       subscription?.unsubscribe();
     };
   }, [fetchProfile]);
@@ -163,28 +220,75 @@ export function AuthProvider({ children }) {
   const signUp = async ({ email, password, fullName, role = 'student', registrationNo = '', phone = '' }) => {
     setLoading(true);
     try {
-      // 1. Register through backend with Supabase Admin API (pre-confirms email, zero rate limits)
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // 1. Try register through backend with Supabase Admin API (pre-confirms email)
+      let registeredViaBackend = false;
+      let data = null;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch(`${API_BASE}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+            fullName: fullName?.trim(),
+            role,
+            registrationNo: registrationNo?.trim(),
+            phone: phone?.trim(),
+            clientOrigin: window.location.origin
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Registration failed');
+        }
+        registeredViaBackend = true;
+      } catch (backendErr) {
+        // If the backend threw a business error (e.g. account already exists), bubble it up
+        if (data && data.error) {
+          throw new Error(data.error);
+        }
+        console.warn('Backend registration unreachable, falling back to direct Supabase registration:', backendErr.message);
+      }
+
+      // If backend was unreachable, fall back to direct Supabase sign-up
+      if (!registeredViaBackend) {
+        const isApproved = role === 'student' || email.trim().toLowerCase() === 'hamang2001@gmail.com';
+        const { data: directAuth, error: directErr } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          fullName: fullName?.trim(),
-          role,
-          registrationNo: registrationNo?.trim(),
-          phone: phone?.trim(),
-          clientOrigin: window.location.origin
-        })
-      });
+          options: {
+            data: {
+              full_name: fullName?.trim(),
+              role,
+              registration_no: registrationNo?.trim(),
+              phone: phone?.trim(),
+              is_approved: isApproved
+            }
+          }
+        });
+        if (directErr) throw directErr;
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Registration failed');
+        if (role !== 'student' && email.trim().toLowerCase() !== 'hamang2001@gmail.com') {
+          return { pendingApproval: true, role, email: email.trim() };
+        }
+
+        if (directAuth?.session) {
+          setSession(directAuth.session);
+          setUser(directAuth.user);
+          await fetchProfile(directAuth.session.access_token, directAuth.user);
+          return { ...directAuth, pendingApproval: false };
+        }
       }
 
       // If pending approval (driver/admin): return pending status (make them wait)
-      if (data.pendingApproval) {
+      if (data?.pendingApproval) {
         return { pendingApproval: true, role, email: email.trim() };
       }
 
@@ -195,13 +299,13 @@ export function AuthProvider({ children }) {
       });
 
       if (signInErr) {
-        return { user: data.user, pendingApproval: false };
+        return { user: data?.user, pendingApproval: false };
       }
 
       setSession(authData.session);
       setUser(authData.user);
       if (authData.session?.access_token) {
-        await fetchProfile(authData.session.access_token);
+        await fetchProfile(authData.session.access_token, authData.user);
       }
 
       return { ...authData, pendingApproval: false };

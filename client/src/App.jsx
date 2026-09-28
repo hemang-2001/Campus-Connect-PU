@@ -23,11 +23,9 @@ import { ShieldAlert, ArrowLeft } from 'lucide-react';
  * Enforces authenticated session & authorized role list.
  */
 function Protected({ allowedRoles, children }) {
-  const { session, role, loading, profile } = useAuth();
+  const { session, role, loading } = useAuth();
 
-  // If auth is loading OR session is present but profile is still resolving,
-  // hold with a loader instead of prematurely assuming role = 'student' and kicking user out!
-  if (loading || (session && !profile && (!role || role === 'student'))) {
+  if (loading) {
     return <Loader message="Verifying campus credentials..." />;
   }
 
@@ -48,10 +46,9 @@ function Protected({ allowedRoles, children }) {
  * Sends drivers to /driver, admins to /admin, and students to StudentHome
  */
 function RoleHome() {
-  const { role, session, loading, profile } = useAuth();
+  const { role, loading } = useAuth();
 
-  // Wait until profile is fully resolved before deciding which dashboard to display
-  if (loading || (session && !profile && (!role || role === 'student'))) {
+  if (loading) {
     return <Loader message="Routing to your dashboard..." />;
   }
 

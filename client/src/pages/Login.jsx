@@ -17,9 +17,9 @@ export default function Login() {
   // If already logged in on initial page visit, redirect to user's role dashboard
   useEffect(() => {
     // Only auto-redirect if user already has an active session (not while actively submitting)
-    if (session && !loading && !isSubmitting && profile) {
+    if (session && !loading && !isSubmitting) {
       const userEmail = session?.user?.email?.toLowerCase();
-      let currentRole = role || profile?.role || session?.user?.user_metadata?.role;
+      let currentRole = role || profile?.role || session?.user?.user_metadata?.role || 'student';
       if (userEmail === ADMIN_EMAIL.toLowerCase()) {
         currentRole = 'admin';
       }
@@ -28,7 +28,7 @@ export default function Login() {
         navigate('/driver', { replace: true });
       } else if (currentRole === 'admin') {
         navigate('/admin', { replace: true });
-      } else if (currentRole === 'student') {
+      } else {
         navigate('/', { replace: true });
       }
     }
