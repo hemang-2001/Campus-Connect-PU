@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 
 const SAMPLE_USERS = [
   {
+    id: 'adb77928-9f05-48a3-a8a4-52ff86ffd012',
     email: 'hamang2001@gmail.com',
     password: 'admin123',
     fullName: 'Hemang Bairwa (Master Admin)',
@@ -37,14 +38,24 @@ async function seed() {
 
   for (const u of SAMPLE_USERS) {
     try {
-      // Check if user already exists
-      const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
-      const existing = (userList?.users || []).find((x) => x.email === u.email);
+      let userId = u.id || null;
 
-      let userId = existing?.id;
-
-      if (!existing) {
-        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      // 1. If explicit id is known (e.g. Master Admin), update directly
+      if (userId) {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          password: u.password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: u.fullName,
+            role: u.role,
+            phone: u.phone,
+            registration_no: u.registrationNo || null
+          }
+        });
+        console.log(`🔄 Updated auth user: ${u.email} (${u.role}) -> ${userId}`);
+      } else {
+        // Try creating user directly via Supabase Auth Admin API
+        const { data: createData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
           email: u.email,
           password: u.password,
           email_confirm: true,
@@ -56,28 +67,16 @@ async function seed() {
           }
         });
 
-        if (error) {
-          console.error(`❌ Failed to create ${u.email}:`, error.message);
+        if (!createErr && createData?.user) {
+          userId = createData.user.id;
+          console.log(`✅ Created auth user: ${u.email} (${u.role}) -> ${userId}`);
+        } else {
+          console.error(`❌ Could not create ${u.email}:`, createErr?.message);
           continue;
         }
-        userId = data.user.id;
-        console.log(`✅ Created auth user: ${u.email} (${u.role})`);
-      } else {
-        // Update password & metadata for existing
-        await supabaseAdmin.auth.admin.updateUserById(existing.id, {
-          password: u.password,
-          email_confirm: true,
-          user_metadata: {
-            full_name: u.fullName,
-            role: u.role,
-            phone: u.phone,
-            registration_no: u.registrationNo || null
-          }
-        });
-        console.log(`🔄 Updated auth user: ${u.email} (${u.role})`);
       }
 
-      // Ensure profile row exists and has correct role
+      // 2. Ensure profile row exists in public.profiles with mail_id
       if (userId) {
         const { error: profileErr } = await supabaseAdmin
           .from('profiles')
@@ -91,17 +90,29 @@ async function seed() {
           });
 
         if (profileErr) {
-          console.warn(`⚠️ Note on profiles upsert for ${u.email}:`, profileErr.message);
+          console.warn(`⚠️ Profiles note for ${u.email}:`, profileErr.message);
         } else {
           console.log(`   Profile linked: ${u.fullName} [${u.role}]`);
         }
+      }
+
+      // 3. Test sign in
+      const { error: loginErr } = await supabaseAdmin.auth.signInWithPassword({
+        email: u.email,
+        password: u.password
+      });
+
+      if (loginErr) {
+        console.error(`   ❌ Sign-in test failed for ${u.email}:`, loginErr.message);
+      } else {
+        console.log(`   ✨ Sign-in verified: SUCCESS`);
       }
     } catch (err) {
       console.error(`Error processing ${u.email}:`, err);
     }
   }
 
-  console.log('🎉 Sample user seeding complete!');
+  console.log('🎉 Sample user seeding process complete!');
   process.exit(0);
 }
 
