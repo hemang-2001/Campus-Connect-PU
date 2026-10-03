@@ -102,6 +102,26 @@ export function useBusLocations() {
           table: 'bus_locations'
         },
         (payload) => {
+          // When a bus location is deleted (e.g. driver stopped broadcasting or turned off location):
+          if (payload.eventType === 'DELETE') {
+            const deletedBusId = payload.old?.bus_id;
+            if (deletedBusId) {
+              setBuses((prevBuses) =>
+                prevBuses.map((bus) =>
+                  bus.id === deletedBusId
+                    ? {
+                        ...bus,
+                        status: 'OFFLINE',
+                        location: null,
+                        has_active_driver: false
+                      }
+                    : bus
+                )
+              );
+            }
+            return;
+          }
+
           const updatedLoc = payload.new;
           if (!updatedLoc || !updatedLoc.bus_id) return;
 
@@ -111,6 +131,7 @@ export function useBusLocations() {
                 return {
                   ...bus,
                   status: updatedLoc.is_mock ? 'MOCK' : 'LIVE',
+                  has_active_driver: true,
                   location: updatedLoc
                 };
               }
@@ -125,6 +146,42 @@ export function useBusLocations() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  // 3. Stale Watchdog: If a bus is marked LIVE but hasn't received a location fix in >45 seconds, mark it OFFLINE
+  useEffect(() => {
+    const watchdogInterval = setInterval(() => {
+      const now = Date.now();
+      setBuses((prevBuses) => {
+        let hasChanges = false;
+        const nextBuses = prevBuses.map((bus) => {
+          if (bus.status === 'LIVE' && bus.location?.updated_at) {
+            const ageMs = now - new Date(bus.location.updated_at).getTime();
+            if (ageMs > 45000) {
+              hasChanges = true;
+              return {
+                ...bus,
+                status: 'OFFLINE',
+                has_active_driver: false
+              };
+            }
+          }
+          return bus;
+        });
+        return hasChanges ? nextBuses : prevBuses;
+      });
+    }, 10000);
+
+    return () => clearInterval(watchdogInterval);
+  }, []);
+
+  // 4. Background re-sync every 30 seconds to maintain database consistency
+  useEffect(() => {
+    const syncInterval = setInterval(() => {
+      fetchActiveBuses();
+    }, 30000);
+
+    return () => clearInterval(syncInterval);
+  }, [fetchActiveBuses]);
 
   // 3. Mock Tracking Simulation Interval (Active if VITE_MOCK_TRACKING=true)
   useEffect(() => {

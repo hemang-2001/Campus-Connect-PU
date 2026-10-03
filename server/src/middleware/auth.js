@@ -43,7 +43,6 @@ export async function requireAuth(req, res, next) {
     if (!finalProfile) {
       const fallbackProfile = {
         id: user.id,
-        email: user.email,
         mail_id: user.email,
         full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
         role: user.user_metadata?.role || 'student',

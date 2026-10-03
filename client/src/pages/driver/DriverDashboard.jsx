@@ -294,19 +294,22 @@ export default function DriverDashboard() {
           }
         },
         (error) => {
-          // Map error codes 1, 2, 3 to friendly messages
+          // Map error codes 1, 2, 3 to friendly messages and auto-stop broadcast if location gets turned off
           switch (error.code) {
             case 1: // PERMISSION_DENIED
-              setGpsError('Location permission denied. Please allow location access in your browser settings.');
+              setGpsError('Location permission denied. Stopped broadcast and took driver offline from map.');
+              stopBroadcasting(true);
               break;
             case 2: // POSITION_UNAVAILABLE
-              setGpsError('GPS signal unavailable. Please ensure phone location is enabled and move to an open area.');
+              setGpsError('GPS location turned off or unavailable. Stopped broadcast and took driver offline from map.');
+              stopBroadcasting(true);
               break;
             case 3: // TIMEOUT
               setGpsError('Location request timed out. Searching for GPS satellites...');
               break;
             default:
-              setGpsError('An unknown GPS error occurred.');
+              setGpsError('Location service error. Stopped broadcast and took driver offline from map.');
+              stopBroadcasting(true);
           }
         },
         options
@@ -346,14 +349,16 @@ export default function DriverDashboard() {
     // Release wake lock
     releaseWakeLock();
 
-    // Notify server
+    // Notify server to take driver offline from map
     if (callServerStop && session?.access_token) {
       try {
         await fetch(`${API_BASE}/api/tracking/stop`, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`
-          }
+          },
+          body: JSON.stringify({ busId: selectedBusIdRef.current })
         });
       } catch (err) {
         console.warn('Error ending server session:', err);
@@ -367,18 +372,46 @@ export default function DriverDashboard() {
     setCurrentAccuracyM(null);
   };
 
-  // Cleanup on component unmount
+  // Cleanup on component unmount and window close/unload
   useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
+    const handleBeforeUnload = () => {
+      if (isBroadcastingRef.current && session?.access_token) {
+        try {
+          fetch(`${API_BASE}/api/tracking/stop`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ busId: selectedBusIdRef.current }),
+            keepalive: true
+          });
+        } catch (e) {
+          // ignore
+        }
       }
-      if (intervalIdRef.current !== null) {
-        clearInterval(intervalIdRef.current);
-      }
-      releaseWakeLock();
     };
-  }, []);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+
+      if (isBroadcastingRef.current) {
+        stopBroadcasting(true);
+      } else {
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+        if (intervalIdRef.current !== null) {
+          clearInterval(intervalIdRef.current);
+        }
+        releaseWakeLock();
+      }
+    };
+  }, [session]);
 
   const selectedBus = buses.find((b) => b.id === selectedBusId);
   const driverEta =

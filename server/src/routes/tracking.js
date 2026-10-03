@@ -30,6 +30,9 @@ router.get('/active', async (req, res) => {
     }
 
     // Format response and determine live broadcast status
+    const now = Date.now();
+    const staleAssignmentIds = [];
+
     const formatted = (buses || []).map((bus) => {
       const activeAssignment = Array.isArray(bus.assignments)
         ? bus.assignments.find((a) => a.active === true)
@@ -38,12 +41,24 @@ router.get('/active', async (req, res) => {
       // Location object or null
       const loc = Array.isArray(bus.location) ? bus.location[0] : bus.location;
 
-      // Check if location was updated within the last 30 seconds
-      const isFresh = loc && (new Date().getTime() - new Date(loc.updated_at).getTime() < 30000);
+      // Check if location fix was received recently (within 45 seconds)
+      const locAgeMs = loc?.updated_at ? now - new Date(loc.updated_at).getTime() : Infinity;
+      const isFresh = locAgeMs < 45000;
 
+      // If assignment is marked active but has had no location fix for >90 seconds, queue for auto-cleanup
+      if (activeAssignment) {
+        const sessionAgeMs = activeAssignment.started_at ? now - new Date(activeAssignment.started_at).getTime() : 0;
+        if (!isFresh && (locAgeMs > 90000 || (!loc && sessionAgeMs > 90000))) {
+          staleAssignmentIds.push(activeAssignment.id);
+        }
+      }
+
+      // STRICT STATUS: A bus is only LIVE if a driver has an active session AND is actively transmitting fresh locations!
       let status = 'OFFLINE';
-      if (activeAssignment || isFresh) {
-        status = loc?.is_mock ? 'MOCK' : 'LIVE';
+      if (loc?.is_mock && isFresh) {
+        status = 'MOCK';
+      } else if (activeAssignment && isFresh && !loc?.is_mock) {
+        status = 'LIVE';
       }
 
       return {
@@ -52,10 +67,19 @@ router.get('/active', async (req, res) => {
         capacity: bus.capacity,
         route: bus.route,
         status,
-        has_active_driver: Boolean(activeAssignment),
-        location: loc || null
+        has_active_driver: Boolean(activeAssignment && isFresh),
+        location: isFresh ? loc : null
       };
     });
+
+    // Auto-expire stale assignments in background so database stays consistent
+    if (staleAssignmentIds.length > 0) {
+      supabaseAdmin
+        .from('driver_assignments')
+        .update({ active: false, ended_at: new Date().toISOString() })
+        .in('id', staleAssignmentIds)
+        .then(() => {});
+    }
 
     return res.json({ buses: formatted });
   } catch (err) {
@@ -150,6 +174,21 @@ router.post('/start', requireAuth, requireRole('driver', 'admin'), async (req, r
  */
 router.post('/stop', requireAuth, requireRole('driver', 'admin'), async (req, res) => {
   try {
+    const busId = req.body?.busId;
+
+    // 1. Find all active buses for this driver
+    const { data: activeAssignments } = await supabaseAdmin
+      .from('driver_assignments')
+      .select('id, bus_id')
+      .eq('driver_id', req.user.id)
+      .eq('active', true);
+
+    const busIds = (activeAssignments || []).map((a) => a.bus_id).filter(Boolean);
+    if (busId && !busIds.includes(busId)) {
+      busIds.push(busId);
+    }
+
+    // 2. Deactivate assignments
     const { error } = await supabaseAdmin
       .from('driver_assignments')
       .update({ active: false, ended_at: new Date().toISOString() })
@@ -160,7 +199,20 @@ router.post('/stop', requireAuth, requireRole('driver', 'admin'), async (req, re
       return res.status(500).json({ error: 'Failed to stop driving session', details: error.message });
     }
 
-    return res.json({ success: true, message: 'Driving session ended' });
+    // 3. Delete live location fix from bus_locations table
+    // This immediately triggers a Supabase Realtime DELETE event so student maps remove the bus marker!
+    if (busIds.length > 0) {
+      const { error: locErr } = await supabaseAdmin
+        .from('bus_locations')
+        .delete()
+        .in('bus_id', busIds);
+
+      if (locErr) {
+        console.warn('Note deleting bus_locations on stop:', locErr.message);
+      }
+    }
+
+    return res.json({ success: true, message: 'Driving session ended and bus marked offline from map' });
   } catch (err) {
     console.error('Unexpected error in /stop:', err);
     return res.status(500).json({ error: 'Internal server error' });

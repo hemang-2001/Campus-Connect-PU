@@ -50,23 +50,29 @@ function createStopIcon(seq, isNext = false) {
   });
 }
 
-const DEFAULT_CENTER = [28.6139, 77.2090]; // Delhi Campus Coordinates
+const DEFAULT_CENTER = [12.020898, 79.855204]; // Pondicherry University (PU) Campus Coordinates
 
 export default function MapView({ buses = [], stops = [], selectedBus, onSelectBus }) {
   // Filter out offline buses from the map for a cleaner look
   const visibleBuses = buses.filter(
-    (bus) => bus.status && bus.status.toUpperCase() !== 'OFFLINE'
+    (bus) => bus.status && bus.status.toUpperCase() !== 'OFFLINE' && bus.location?.lat && bus.location?.lng
   );
 
   const isSelectedActive = Boolean(
-    selectedBus && selectedBus.status && selectedBus.status.toUpperCase() !== 'OFFLINE'
+    selectedBus &&
+    selectedBus.status &&
+    selectedBus.status.toUpperCase() !== 'OFFLINE' &&
+    selectedBus.location?.lat &&
+    selectedBus.location?.lng
   );
   const targetBus = isSelectedActive ? selectedBus : (visibleBuses[0] || null);
 
-  // Determine center from selected active bus, first visible bus, or fallback
+  // Determine center from selected active bus, first visible bus, first stop, or campus center
   const mapCenter = targetBus?.location?.lat && targetBus?.location?.lng
     ? [targetBus.location.lat, targetBus.location.lng]
-    : DEFAULT_CENTER;
+    : (stops && stops.length > 0 && stops[0].lat && stops[0].lng
+        ? [stops[0].lat, stops[0].lng]
+        : DEFAULT_CENTER);
 
   // Compute selected bus ETA for stop markers only if selected bus is active
   const selectedEta = isSelectedActive ? getBusETA(selectedBus, stops) : null;

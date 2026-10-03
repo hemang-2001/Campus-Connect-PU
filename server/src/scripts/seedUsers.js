@@ -3,7 +3,8 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 const SAMPLE_USERS = [
   {
     email: 'hamang2001@gmail.com',
-    fullName: 'Hemang Bairwa (Lead Admin)',
+    password: 'admin123',
+    fullName: 'Hemang Bairwa (Master Admin)',
     role: 'admin',
     phone: '+91 93198 24831'
   },
@@ -82,7 +83,6 @@ async function seed() {
           .from('profiles')
           .upsert({
             id: userId,
-            email: u.email,
             mail_id: u.email,
             full_name: u.fullName,
             role: u.role,

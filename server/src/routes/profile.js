@@ -13,7 +13,7 @@ router.get('/me', requireAuth, async (req, res) => {
   try {
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, mail_id, full_name, role, registration_no, phone, avatar_url, created_at')
+      .select('id, mail_id, full_name, role, registration_no, phone, avatar_url, created_at')
       .eq('id', req.user.id)
       .maybeSingle();
 
@@ -22,12 +22,17 @@ router.get('/me', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'Failed to retrieve profile', details: error.message });
     }
 
+    const resolvedProfile = profile || req.profile;
+    const finalProfile = resolvedProfile
+      ? { ...resolvedProfile, email: resolvedProfile.mail_id || req.user.email }
+      : null;
+
     return res.json({
       user: {
         id: req.user.id,
         email: req.user.email
       },
-      profile: profile || req.profile
+      profile: finalProfile
     });
   } catch (err) {
     console.error('Unexpected error in GET /profile/me:', err);
@@ -57,7 +62,7 @@ router.patch('/me', requireAuth, async (req, res) => {
       .from('profiles')
       .update(updates)
       .eq('id', req.user.id)
-      .select('id, email, mail_id, full_name, role, registration_no, phone, avatar_url, created_at')
+      .select('id, mail_id, full_name, role, registration_no, phone, avatar_url, created_at')
       .single();
 
     if (error) {
@@ -67,7 +72,10 @@ router.patch('/me', requireAuth, async (req, res) => {
 
     return res.json({
       message: 'Profile updated successfully',
-      profile: updated
+      profile: {
+        ...updated,
+        email: updated.mail_id || req.user.email
+      }
     });
   } catch (err) {
     console.error('Unexpected error in PATCH /profile/me:', err);

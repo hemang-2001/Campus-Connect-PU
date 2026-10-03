@@ -70,7 +70,6 @@ router.get('/approve', async (req, res) => {
         .from('profiles')
         .upsert({
           id: userToApprove.id,
-          email: userToApprove.email,
           mail_id: userToApprove.email,
           role: userToApprove.user_metadata?.role || 'driver',
           full_name: userToApprove.user_metadata?.full_name || ''
@@ -155,8 +154,8 @@ router.post('/register', async (req, res) => {
     // 1. Check if account already exists in the database (public.profiles)
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, email, mail_id, registration_no')
-      .or(`email.ilike.${cleanEmail},mail_id.ilike.${cleanEmail}`)
+      .select('id, full_name, role, mail_id, registration_no')
+      .ilike('mail_id', cleanEmail)
       .maybeSingle();
 
     // Check auth.users as well
@@ -242,7 +241,7 @@ router.post('/register', async (req, res) => {
         const { data: dbCheck } = await supabaseAdmin
           .from('profiles')
           .select('id')
-          .or(`email.ilike.${cleanEmail},mail_id.ilike.${cleanEmail}`)
+          .ilike('mail_id', cleanEmail)
           .maybeSingle();
 
         if (dbCheck) {
@@ -289,7 +288,6 @@ router.post('/register', async (req, res) => {
         .from('profiles')
         .upsert({
           id: userId,
-          email: cleanEmail,
           mail_id: cleanEmail,
           full_name: fullName || '',
           role: userRole,
@@ -408,7 +406,7 @@ router.get('/users', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const { data: profiles, error: profErr } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, email, mail_id, registration_no, phone, created_at')
+      .select('id, full_name, role, mail_id, registration_no, phone, created_at')
       .order('created_at', { ascending: false });
 
     const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
@@ -461,7 +459,6 @@ router.patch('/approve/:id', requireAuth, requireRole('admin'), async (req, res)
       .from('profiles')
       .upsert({
         id: id,
-        email: u.email,
         mail_id: u.email,
         role: approvedRole,
         full_name: u.user_metadata?.full_name || u.email.split('@')[0]

@@ -11,7 +11,7 @@ async function cleanup() {
 
   const { data: profiles, error: profErr } = await supabaseAdmin
     .from('profiles')
-    .select('id, email, mail_id, role');
+    .select('id, mail_id, role');
 
   if (profErr) {
     console.error('Failed to list profiles:', profErr);
@@ -26,11 +26,9 @@ async function cleanup() {
     console.log('👑 Creating lead admin profile for hamang2001@gmail.com...');
     await supabaseAdmin.from('profiles').upsert({
       id: leadAdminAuth.id,
-      email: 'hamang2001@gmail.com',
       mail_id: 'hamang2001@gmail.com',
-      full_name: 'Hemang Bairwa (Lead Admin)',
-      role: 'admin',
-      is_approved: true
+      full_name: 'Hemang Bairwa (Master Admin)',
+      role: 'admin'
     });
     profileIds.add(leadAdminAuth.id);
   }
