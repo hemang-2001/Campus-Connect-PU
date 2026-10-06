@@ -4,13 +4,17 @@ import { getNextMockLocation } from '../lib/mockTracker';
 
 export const FALLBACK_STOPS = {
   default: [
-    { id: '1', name: 'Campus Main Gate', lat: 28.6139, lng: 77.2090, seq: 1 },
-    { id: '2', name: 'Science & Tech Block', lat: 28.6185, lng: 77.2145, seq: 2 },
-    { id: '3', name: 'Central Library & Arts', lat: 28.6240, lng: 77.2210, seq: 3 }
+    { id: '1', name: 'University Main Gate 1', lat: 12.019596, lng: 79.859077, seq: 1 },
+    { id: '2', name: 'Reading Room/MBA Department', lat: 12.020898, lng: 79.855204, seq: 2 },
+    { id: '3', name: 'Health Care Center', lat: 12.019434, lng: 79.850250, seq: 3 },
+    { id: '4', name: 'Open Air Theatre', lat: 12.026560, lng: 79.847402, seq: 4 },
+    { id: '5', name: 'Silver Jubilee Campus', lat: 12.033146, lng: 79.857535, seq: 5 }
   ],
   hostel: [
-    { id: 'h1', name: 'Hostel Complex East', lat: 28.6080, lng: 77.2020, seq: 1 },
-    { id: 'h2', name: 'Sports Complex Arena', lat: 28.6110, lng: 77.2060, seq: 2 }
+    { id: 'h1', name: 'Ganga Girls Hostel', lat: 12.021689, lng: 79.849130, seq: 1 },
+    { id: 'h2', name: 'Mother Teresa Mess', lat: 12.022298, lng: 79.847990, seq: 2 },
+    { id: 'h3', name: 'Narmada Hostel', lat: 12.022996, lng: 79.847145, seq: 3 },
+    { id: 'h4', name: 'Kannagi Hostel', lat: 12.024014, lng: 79.846627, seq: 4 }
   ]
 };
 
@@ -125,9 +129,11 @@ export function useBusLocations() {
           const updatedLoc = payload.new;
           if (!updatedLoc || !updatedLoc.bus_id) return;
 
-          setBuses((prevBuses) =>
-            prevBuses.map((bus) => {
+          let found = false;
+          setBuses((prevBuses) => {
+            const updated = prevBuses.map((bus) => {
               if (bus.id === updatedLoc.bus_id) {
+                found = true;
                 return {
                   ...bus,
                   status: updatedLoc.is_mock ? 'MOCK' : 'LIVE',
@@ -136,18 +142,28 @@ export function useBusLocations() {
                 };
               }
               return bus;
-            })
-          );
+            });
+            return updated;
+          });
+
+          // If this bus wasn't in our local state yet, trigger a full fleet refresh
+          if (!found) {
+            fetchActiveBuses();
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          fetchActiveBuses();
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchActiveBuses]);
 
-  // 3. Stale Watchdog: If a bus is marked LIVE but hasn't received a location fix in >45 seconds, mark it OFFLINE
+  // 3. Stale Watchdog: Keep LIVE if location fix received within 90 seconds (never kill in 5-10s)
   useEffect(() => {
     const watchdogInterval = setInterval(() => {
       const now = Date.now();
@@ -156,7 +172,8 @@ export function useBusLocations() {
         const nextBuses = prevBuses.map((bus) => {
           if (bus.status === 'LIVE' && bus.location?.updated_at) {
             const ageMs = now - new Date(bus.location.updated_at).getTime();
-            if (ageMs > 45000) {
+            // Only transition to OFFLINE if no fix for >90 seconds
+            if (ageMs > 90000) {
               hasChanges = true;
               return {
                 ...bus,
@@ -174,11 +191,11 @@ export function useBusLocations() {
     return () => clearInterval(watchdogInterval);
   }, []);
 
-  // 4. Background re-sync every 30 seconds to maintain database consistency
+  // 4. Background re-sync every 6 seconds as a solid fallback to WebSocket
   useEffect(() => {
     const syncInterval = setInterval(() => {
       fetchActiveBuses();
-    }, 30000);
+    }, 6000);
 
     return () => clearInterval(syncInterval);
   }, [fetchActiveBuses]);

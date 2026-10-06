@@ -41,23 +41,24 @@ router.get('/active', async (req, res) => {
       // Location object or null
       const loc = Array.isArray(bus.location) ? bus.location[0] : bus.location;
 
-      // Check if location fix was received recently (within 45 seconds)
+      // Check if location fix was received recently (within 90 seconds for fresh, 5 minutes for displayable)
       const locAgeMs = loc?.updated_at ? now - new Date(loc.updated_at).getTime() : Infinity;
-      const isFresh = locAgeMs < 45000;
+      const isFresh = locAgeMs < 90000;
+      const isDisplayable = locAgeMs < 300000;
 
-      // If assignment is marked active but has had no location fix for >90 seconds, queue for auto-cleanup
+      // Auto-expire stale assignments only after 5 minutes (300s) of zero location fixes
       if (activeAssignment) {
         const sessionAgeMs = activeAssignment.started_at ? now - new Date(activeAssignment.started_at).getTime() : 0;
-        if (!isFresh && (locAgeMs > 90000 || (!loc && sessionAgeMs > 90000))) {
+        if (!isFresh && (locAgeMs > 300000 || (!loc && sessionAgeMs > 300000))) {
           staleAssignmentIds.push(activeAssignment.id);
         }
       }
 
-      // STRICT STATUS: A bus is only LIVE if a driver has an active session AND is actively transmitting fresh locations!
+      // STRICT STATUS: A bus is LIVE if a driver has an active session and has sent fixes recently
       let status = 'OFFLINE';
       if (loc?.is_mock && isFresh) {
         status = 'MOCK';
-      } else if (activeAssignment && isFresh && !loc?.is_mock) {
+      } else if (activeAssignment && (isFresh || isDisplayable) && !loc?.is_mock) {
         status = 'LIVE';
       }
 
@@ -67,8 +68,8 @@ router.get('/active', async (req, res) => {
         capacity: bus.capacity,
         route: bus.route,
         status,
-        has_active_driver: Boolean(activeAssignment && isFresh),
-        location: isFresh ? loc : null
+        has_active_driver: Boolean(activeAssignment && (isFresh || isDisplayable)),
+        location: (isFresh || isDisplayable) ? loc : null
       };
     });
 
@@ -252,9 +253,23 @@ router.post('/location', requireAuth, async (req, res) => {
         .maybeSingle();
 
       if (checkErr || !activeSession) {
-        return res.status(403).json({
-          error: 'Session ended or not active for this bus. Please restart broadcast.'
-        });
+        // Auto-heal assignment so driver broadcast is NEVER killed by a transient 403
+        const { data: healed } = await supabaseAdmin
+          .from('driver_assignments')
+          .insert({
+            driver_id: req.user.id,
+            bus_id: busId,
+            active: true,
+            started_at: new Date().toISOString()
+          })
+          .select('id')
+          .maybeSingle();
+
+        if (!healed) {
+          return res.status(403).json({
+            error: 'Session ended or not active for this bus. Please restart broadcast.'
+          });
+        }
       }
     }
 

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { supabase, API_BASE } from '../../lib/supabaseClient';
 import Badge from '../../components/Badge';
 import { getBusETA } from '../../lib/eta';
+import { getNextMockLocation } from '../../lib/mockTracker';
 import {
   Radio,
   StopCircle,
@@ -27,6 +28,7 @@ export default function DriverDashboard() {
   const [selectedBusId, setSelectedBusId] = useState('');
   const [driverStops, setDriverStops] = useState([]);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [simulationMode, setSimulationMode] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pointsSentCount, setPointsSentCount] = useState(0);
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState(0);
@@ -45,9 +47,14 @@ export default function DriverDashboard() {
   const offlineQueueRef = useRef([]);
   const isBroadcastingRef = useRef(false);
   const selectedBusIdRef = useRef('');
+  const sessionRef = useRef(session);
+  const simulationModeRef = useRef(false);
+  const useHighAccuracyRef = useRef(true);
 
   isBroadcastingRef.current = isBroadcasting;
   selectedBusIdRef.current = selectedBusId;
+  sessionRef.current = session;
+  simulationModeRef.current = simulationMode;
 
   // 1. Load active buses & restore existing driving assignment on page load
   useEffect(() => {
@@ -143,16 +150,18 @@ export default function DriverDashboard() {
 
   // Push location fix to server (Step 4 & 5)
   const pushLocation = useCallback(async (fix) => {
-    if (!fix || !selectedBusIdRef.current || !session?.access_token) return;
+    const token = sessionRef.current?.access_token;
+    const busId = selectedBusIdRef.current;
+    if (!fix || !busId || !token) return;
 
     const now = Date.now();
-    // Throttle: skip if <4.5s since last push
-    if (now - lastPushTimeRef.current < 4500) {
+    // Throttle: skip if <2.5s since last push
+    if (now - lastPushTimeRef.current < 2500) {
       return;
     }
 
     const payload = {
-      busId: selectedBusIdRef.current,
+      busId,
       lat: fix.coords.latitude,
       lng: fix.coords.longitude,
       speedKmh: Math.max(0, (fix.coords.speed ?? 0) * 3.6),
@@ -165,19 +174,16 @@ export default function DriverDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(payload)
       });
 
-      // Step 6: On 403 response: "Session ended — restart broadcast", auto-stop
-      if (res.status === 403) {
-        setSessionError('Session ended — restart broadcast');
-        stopBroadcasting(false); // Stop local broadcast
-        return;
-      }
-
       if (!res.ok) {
+        if (res.status === 403) {
+          console.warn('Location push 403 notice (auto-recovering)...');
+          return;
+        }
         throw new Error(`Server returned status ${res.status}`);
       }
 
@@ -191,7 +197,44 @@ export default function DriverDashboard() {
       // Step 5: On failure, keep in offlineQueue ref
       offlineQueueRef.current.push(payload);
     }
-  }, [session]);
+  }, []);
+
+  // Push custom simulated location fix to server (Simulation / Test mode)
+  const pushCustomLocation = useCallback(async (loc) => {
+    const token = sessionRef.current?.access_token;
+    const busId = selectedBusIdRef.current;
+    if (!loc || !busId || !token) return;
+
+    const payload = {
+      busId,
+      lat: loc.lat,
+      lng: loc.lng,
+      speedKmh: loc.speed_kmh || 24,
+      heading: loc.heading || 0,
+      isMock: Boolean(loc.is_mock)
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/api/tracking/location`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        lastPushTimeRef.current = Date.now();
+        setPointsSentCount((c) => c + 1);
+        setCurrentSpeedKmh(Math.round(payload.speedKmh));
+        setCurrentAccuracyM(8);
+        setCurrentCoords({ lat: payload.lat, lng: payload.lng });
+      }
+    } catch (err) {
+      console.warn('Custom location push error:', err.message);
+    }
+  }, []);
 
   // Flush offline queue when reconnected (Step 5)
   const flushOfflineQueue = useCallback(async () => {
@@ -249,18 +292,14 @@ export default function DriverDashboard() {
       return;
     }
 
-    if (!navigator.geolocation) {
-      setGpsError('Geolocation is not supported by your browser.');
-      return;
-    }
-
     try {
       // 1. POST /api/tracking/start { busId } — abort if 409
+      const token = sessionRef.current?.access_token;
       const res = await fetch(`${API_BASE}/api/tracking/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ busId: selectedBusId })
       });
@@ -274,55 +313,97 @@ export default function DriverDashboard() {
         throw new Error(data.error || 'Failed to initialize driving session');
       }
 
-      // 2. Request Screen Wake Lock (Step 3)
+      // 2. Request Screen Wake Lock
       await requestWakeLock();
 
-      // 3. navigator.geolocation.watchPosition (Step 2)
-      const options = {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 20000
+      const chosenBus = buses.find((b) => b.id === selectedBusId);
+
+      // Simulation / Test Driving Mode (Pondicherry University campus loop)
+      if (simulationModeRef.current) {
+        const initialMock = getNextMockLocation(selectedBusId, chosenBus?.route?.name);
+        pushCustomLocation(initialMock);
+
+        const intervalId = setInterval(() => {
+          if (!isBroadcastingRef.current) return;
+          const nextMock = getNextMockLocation(selectedBusIdRef.current, chosenBus?.route?.name);
+          pushCustomLocation(nextMock);
+        }, 4000);
+
+        intervalIdRef.current = intervalId;
+        setIsBroadcasting(true);
+        return;
+      }
+
+      // Physical GPS Hardware Mode
+      if (!navigator.geolocation) {
+        setGpsError('Geolocation is not supported by your browser.');
+        return;
+      }
+
+      const handleGeoSuccess = (position) => {
+        latestFixRef.current = position;
+        setGpsError('');
+        if (lastPushTimeRef.current === 0) {
+          pushLocation(position);
+        }
       };
 
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          latestFixRef.current = position;
-          setGpsError('');
-          // Immediately try push if first fix
-          if (lastPushTimeRef.current === 0) {
-            pushLocation(position);
-          }
-        },
-        (error) => {
-          // Map error codes 1, 2, 3 to friendly messages and auto-stop broadcast if location gets turned off
-          switch (error.code) {
-            case 1: // PERMISSION_DENIED
-              setGpsError('Location permission denied. Stopped broadcast and took driver offline from map.');
-              stopBroadcasting(true);
-              break;
-            case 2: // POSITION_UNAVAILABLE
-              setGpsError('GPS location turned off or unavailable. Stopped broadcast and took driver offline from map.');
-              stopBroadcasting(true);
-              break;
-            case 3: // TIMEOUT
-              setGpsError('Location request timed out. Searching for GPS satellites...');
-              break;
-            default:
-              setGpsError('Location service error. Stopped broadcast and took driver offline from map.');
-              stopBroadcasting(true);
-          }
-        },
-        options
+      const handleGeoError = (error) => {
+        console.warn('Geolocation notice:', error.code, error.message);
+        switch (error.code) {
+          case 1: // PERMISSION_DENIED
+            setGpsError('Location permission denied by browser. Please allow location permissions in browser settings.');
+            stopBroadcasting(true);
+            break;
+          case 2: // POSITION_UNAVAILABLE
+            setGpsError('GPS signal weak / acquiring satellites... Retrying (Broadcast remains ACTIVE).');
+            // Gracefully retry with network positioning if high-accuracy satellite failed
+            if (useHighAccuracyRef.current && navigator.geolocation) {
+              useHighAccuracyRef.current = false;
+              if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+              }
+              watchIdRef.current = navigator.geolocation.watchPosition(
+                handleGeoSuccess,
+                handleGeoError,
+                { enableHighAccuracy: false, maximumAge: 10000, timeout: 25000 }
+              );
+            }
+            break;
+          case 3: // TIMEOUT
+            setGpsError('GPS request timed out. Searching for satellites... Broadcast remains ACTIVE.');
+            break;
+          default:
+            setGpsError(`GPS signal note: ${error.message || 'Connecting...'}`);
+        }
+      };
+
+      // Fast initial fix attempt so coordinates register immediately without waiting
+      navigator.geolocation.getCurrentPosition(
+        handleGeoSuccess,
+        (err) => { console.warn('Fast fix initial notice:', err.message); },
+        { enableHighAccuracy: false, timeout: 5000 }
       );
 
+      // Start continuous watch
+      useHighAccuracyRef.current = true;
+      const watchId = navigator.geolocation.watchPosition(
+        handleGeoSuccess,
+        handleGeoError,
+        {
+          enableHighAccuracy: true,
+          maximumAge: 10000,
+          timeout: 20000
+        }
+      );
       watchIdRef.current = watchId;
 
-      // 4. setInterval every 5000ms to push latest fix (Step 4)
+      // Regular heartbeat interval (every 4000ms): keeps bus active even if stationary
       const intervalId = setInterval(() => {
         if (latestFixRef.current) {
           pushLocation(latestFixRef.current);
         }
-      }, 5000);
+      }, 4000);
 
       intervalIdRef.current = intervalId;
       setIsBroadcasting(true);
@@ -349,16 +430,19 @@ export default function DriverDashboard() {
     // Release wake lock
     releaseWakeLock();
 
+    const token = sessionRef.current?.access_token;
+    const busId = selectedBusIdRef.current;
+
     // Notify server to take driver offline from map
-    if (callServerStop && session?.access_token) {
+    if (callServerStop && token && busId) {
       try {
         await fetch(`${API_BASE}/api/tracking/stop`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`
+            Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ busId: selectedBusIdRef.current })
+          body: JSON.stringify({ busId })
         });
       } catch (err) {
         console.warn('Error ending server session:', err);
@@ -375,15 +459,17 @@ export default function DriverDashboard() {
   // Cleanup on component unmount and window close/unload
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isBroadcastingRef.current && session?.access_token) {
+      const token = sessionRef.current?.access_token;
+      const busId = selectedBusIdRef.current;
+      if (isBroadcastingRef.current && token && busId) {
         try {
           fetch(`${API_BASE}/api/tracking/stop`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${session.access_token}`
+              Authorization: `Bearer ${token}`
             },
-            body: JSON.stringify({ busId: selectedBusIdRef.current }),
+            body: JSON.stringify({ busId }),
             keepalive: true
           });
         } catch (e) {
@@ -411,7 +497,7 @@ export default function DriverDashboard() {
         releaseWakeLock();
       }
     };
-  }, [session]);
+  }, []);
 
   const selectedBus = buses.find((b) => b.id === selectedBusId);
   const driverEta =
@@ -509,6 +595,54 @@ export default function DriverDashboard() {
           </select>
         </div>
 
+        {/* Simulation / Test Mode Toggle */}
+        <div
+          style={{
+            marginTop: '12px',
+            marginBottom: '14px',
+            padding: '10px 12px',
+            backgroundColor: simulationMode ? 'var(--blue-light)' : 'var(--gray-50)',
+            border: `1.5px solid ${simulationMode ? 'var(--blue)' : 'var(--gray-200)'}`,
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '8px'
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Navigation size={14} color={simulationMode ? 'var(--blue)' : 'var(--gray-600)'} />
+              <strong style={{ fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
+                {simulationMode ? 'Simulation Test Mode ON' : 'Phone GPS Hardware Mode'}
+              </strong>
+            </div>
+            <span className="text-xs text-muted" style={{ display: 'block', marginTop: '2px' }}>
+              {simulationMode
+                ? 'Simulates bus moving along Pondicherry University campus loop (No GPS needed)'
+                : 'Broadcasts real device GPS coordinates every 4 seconds'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{
+              padding: '4px 10px',
+              fontSize: '0.75rem',
+              backgroundColor: simulationMode ? 'var(--blue)' : '#ffffff',
+              color: simulationMode ? '#ffffff' : 'var(--gray-700)',
+              borderColor: simulationMode ? 'var(--blue)' : 'var(--gray-300)',
+              whiteSpace: 'nowrap'
+            }}
+            disabled={isBroadcasting}
+            onClick={() => setSimulationMode((prev) => !prev)}
+            title="Toggle between physical phone GPS and simulated campus route"
+          >
+            {simulationMode ? 'Switch to Real GPS' : 'Enable Simulation'}
+          </button>
+        </div>
+
         {!isBroadcasting ? (
           <button
             type="button"
@@ -517,7 +651,7 @@ export default function DriverDashboard() {
             disabled={!selectedBusId || buses.length === 0}
           >
             <PlayCircle size={20} />
-            <span>Start Live GPS Broadcast</span>
+            <span>{simulationMode ? 'Start Simulated Campus Drive' : 'Start Live GPS Broadcast'}</span>
           </button>
         ) : (
           <button
