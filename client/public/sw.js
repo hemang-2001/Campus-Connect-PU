@@ -127,3 +127,52 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// 4. Notification Click Event: Focus or open the alerts tab
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/alerts';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          if ('navigate' in client) {
+            client.navigate(targetUrl);
+          }
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
+// 5. Push Event: Show native system notification on push payload
+self.addEventListener('push', (event) => {
+  let data = { title: 'Campus Connect Alert', body: 'New shuttle update published.', url: '/alerts' };
+  try {
+    if (event.data) {
+      data = event.data.json();
+    }
+  } catch (err) {
+    if (event.data) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body || 'New shuttle update published.',
+    icon: '/icons/icon-192.svg',
+    badge: '/icons/icon.svg',
+    vibrate: [200, 100, 200],
+    data: { url: data.url || '/alerts' }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Campus Transit Alert', options)
+  );
+});
+

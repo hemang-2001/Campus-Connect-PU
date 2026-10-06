@@ -1,15 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useAlertNotifications } from '../context/AlertNotificationContext';
 import { API_BASE } from '../lib/supabaseClient';
 import Badge from '../components/Badge';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
-import { Bell, AlertTriangle, Info, PlusCircle, CheckCircle, Clock } from 'lucide-react';
+import {
+  Bell,
+  BellRing,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  PlusCircle,
+  CheckCircle,
+  Clock,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  CheckCheck
+} from 'lucide-react';
 
 export default function Alerts() {
   const { session, role } = useAuth();
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    alerts,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    notificationPermission,
+    requestSystemPermission,
+    soundEnabled,
+    toggleSound,
+    triggerTestAlert,
+    fetchAlerts
+  } = useAlertNotifications();
+
+  const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
   // Form states for Admin
@@ -18,25 +44,6 @@ export default function Alerts() {
   const [severity, setSeverity] = useState('info');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  const fetchAlerts = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_BASE}/api/alerts`);
-      if (res.ok) {
-        const data = await res.json();
-        setAlerts(data.alerts || []);
-      }
-    } catch (err) {
-      console.error('Error fetching alerts:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAlerts();
-  }, []);
 
   const handleCreateAlert = async (e) => {
     e.preventDefault();
@@ -84,23 +91,161 @@ export default function Alerts() {
 
   return (
     <div style={{ padding: '16px 0' }}>
-      <div className="flex-between mb-4">
+      {/* Header */}
+      <div className="flex-between mb-3">
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Campus Alerts</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Campus Alerts</h2>
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  backgroundColor: 'var(--rose-light)',
+                  color: 'var(--rose)',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  border: '1px solid rgba(239, 68, 68, 0.3)'
+                }}
+              >
+                {unreadCount} unread
+              </span>
+            )}
+          </div>
           <p className="text-xs text-muted">Service delays, route updates & safety notices</p>
         </div>
 
-        {role === 'admin' && (
+        <div className="flex-row">
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ fontSize: '0.75rem', padding: '6px 10px' }}
+              onClick={markAllAsRead}
+              title="Mark all as read"
+            >
+              <CheckCheck size={14} />
+              <span>Read All</span>
+            </button>
+          )}
+
+          {role === 'admin' && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ fontSize: '0.8125rem', padding: '6px 12px' }}
+              onClick={() => setShowCreate(!showCreate)}
+            >
+              <PlusCircle size={16} />
+              {showCreate ? 'Close' : 'Post Alert'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* App Notification Banner & Push Settings Control Card */}
+      <div
+        className="card mb-3"
+        style={{
+          padding: '12px 14px',
+          background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+          border: '1px solid #dbeafe'
+        }}
+      >
+        <div className="flex-between mb-2">
+          <div className="flex-row">
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--blue)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff'
+              }}
+            >
+              <BellRing size={16} />
+            </div>
+            <div>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--gray-900)' }}>
+                Live App Notifications
+              </span>
+              <p style={{ fontSize: '0.7rem', color: 'var(--gray-600)' }}>
+                Floating heads-up alerts with sound, vibration & push
+              </p>
+            </div>
+          </div>
+
+          {/* Sound Mute/Unmute */}
           <button
             type="button"
-            className="btn btn-primary"
-            style={{ fontSize: '0.8125rem', padding: '6px 12px' }}
-            onClick={() => setShowCreate(!showCreate)}
+            className="btn btn-outline"
+            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+            onClick={toggleSound}
+            title={soundEnabled ? 'Chime sound is active' : 'Chime sound is muted'}
           >
-            <PlusCircle size={16} />
-            {showCreate ? 'Close' : 'Post Alert'}
+            {soundEnabled ? <Volume2 size={14} color="var(--blue)" /> : <VolumeX size={14} />}
+            <span>{soundEnabled ? 'Chime ON' : 'Muted'}</span>
           </button>
-        )}
+        </div>
+
+        {/* Status & Quick Actions */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
+          {notificationPermission !== 'granted' ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ fontSize: '0.75rem', padding: '5px 10px', backgroundColor: 'var(--blue)' }}
+              onClick={requestSystemPermission}
+            >
+              <Bell size={13} />
+              <span>Enable Browser Push</span>
+            </button>
+          ) : (
+            <span
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                color: 'var(--emerald)',
+                backgroundColor: 'var(--emerald-light)',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                border: '1px solid rgba(16, 185, 129, 0.2)'
+              }}
+            >
+              <CheckCircle size={12} />
+              <span>System Push Active</span>
+            </span>
+          )}
+
+          {/* Test Buttons to simulate mobile notifications */}
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ fontSize: '0.75rem', padding: '5px 10px' }}
+            onClick={() => triggerTestAlert('warning')}
+            title="Simulate delay alert notification banner"
+          >
+            <Sparkles size={13} color="var(--amber)" />
+            <span>Test Warning Alert</span>
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            style={{ fontSize: '0.75rem', padding: '5px 10px' }}
+            onClick={() => triggerTestAlert('critical')}
+            title="Simulate critical emergency alert notification banner"
+          >
+            <Sparkles size={13} color="var(--rose)" />
+            <span>Test Critical Alert</span>
+          </button>
+        </div>
       </div>
 
       {/* Admin Quick Post Form */}
@@ -193,15 +338,17 @@ export default function Alerts() {
             return (
               <div
                 key={alert.id}
-                className="card"
+                className="card card-interactive"
+                onClick={() => markAsRead(alert.id)}
                 style={{
-                  borderLeft: `4px solid ${isCrit ? 'var(--rose)' : isWarn ? 'var(--amber)' : 'var(--blue)'}`
+                  borderLeft: `4px solid ${isCrit ? 'var(--rose)' : isWarn ? 'var(--amber)' : 'var(--blue)'}`,
+                  cursor: 'pointer'
                 }}
               >
                 <div className="flex-between mb-2">
                   <div className="flex-row">
                     {isCrit ? (
-                      <AlertTriangle size={18} color="var(--rose)" />
+                      <AlertCircle size={18} color="var(--rose)" />
                     ) : isWarn ? (
                       <AlertTriangle size={18} color="var(--amber)" />
                     ) : (
@@ -226,7 +373,7 @@ export default function Alerts() {
                   </span>
                   {alert.route?.name && (
                     <span style={{ fontWeight: 600, color: 'var(--blue)' }}>
-                      {alert.route.name}
+                      📍 {alert.route.name}
                     </span>
                   )}
                 </div>

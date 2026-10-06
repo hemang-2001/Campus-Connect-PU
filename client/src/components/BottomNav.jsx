@@ -1,10 +1,41 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlertNotifications } from '../context/AlertNotificationContext';
 import { MapPin, Bell, MessageSquare, User, Radio, BarChart3, ClipboardList } from 'lucide-react';
 
 export default function BottomNav() {
   const { role } = useAuth();
+  const { unreadCount } = useAlertNotifications();
+
+  const renderAlertIcon = () => (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Bell size={20} />
+      {unreadCount > 0 && (
+        <span
+          style={{
+            position: 'absolute',
+            top: '-5px',
+            right: '-9px',
+            minWidth: '16px',
+            height: '16px',
+            borderRadius: '9999px',
+            backgroundColor: 'var(--rose)',
+            color: '#ffffff',
+            fontSize: '0.625rem',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0 3px',
+            boxShadow: '0 0 0 1.5px #ffffff'
+          }}
+        >
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <nav className="bottom-nav" aria-label="Bottom Navigation">
@@ -33,11 +64,12 @@ export default function BottomNav() {
           <NavLink
             to="/alerts"
             className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
-            aria-label="Alerts"
+            aria-label={`Alerts ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
           >
-            <Bell size={20} />
+            {renderAlertIcon()}
             <span>Alerts</span>
           </NavLink>
+
 
           <NavLink
             to="/profile"
@@ -66,9 +98,9 @@ export default function BottomNav() {
           <NavLink
             to="/alerts"
             className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
-            aria-label="Alerts"
+            aria-label={`Alerts ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
           >
-            <Bell size={20} />
+            {renderAlertIcon()}
             <span>Alerts</span>
           </NavLink>
 
@@ -108,11 +140,12 @@ export default function BottomNav() {
           <NavLink
             to="/alerts"
             className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}
-            aria-label="Manage Alerts"
+            aria-label={`Manage Alerts ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
           >
-            <Bell size={20} />
+            {renderAlertIcon()}
             <span>Alerts</span>
           </NavLink>
+
 
           <NavLink
             to="/profile"

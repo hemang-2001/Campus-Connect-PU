@@ -3,6 +3,8 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import BottomNav from './BottomNav';
 import InstallPrompt from './InstallPrompt';
+import NotificationCenter from './NotificationCenter';
+import AppNotificationBanner from './AppNotificationBanner';
 import { Bus, LogOut, ShieldAlert } from 'lucide-react';
 
 export default function Layout() {
@@ -14,6 +16,9 @@ export default function Layout() {
 
   return (
     <div className="app-container">
+      {/* Floating Heads-Up Mobile App Notification */}
+      <AppNotificationBanner />
+
       {/* Topbar Header */}
       <header className="topbar">
         <Link to="/" className="topbar-brand">
@@ -23,7 +28,10 @@ export default function Layout() {
           <span>Campus Connect</span>
         </Link>
 
-        <div className="topbar-actions">
+        <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Real-time Notification Center Bell & Dropdown */}
+          <NotificationCenter />
+
           {role && (
             <span
               style={{

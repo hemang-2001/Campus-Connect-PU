@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { AlertNotificationProvider } from './context/AlertNotificationContext';
 
 import Layout from './components/Layout';
 import Loader from './components/Loader';
@@ -60,7 +61,9 @@ function RoleHome() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <AlertNotificationProvider>
+        <Routes>
+
         {/* Public Authentication Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -128,6 +131,8 @@ export default function App() {
         {/* Catch-all Redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </AlertNotificationProvider>
     </BrowserRouter>
   );
 }
+

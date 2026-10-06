@@ -231,6 +231,17 @@ EXCEPTION
     NULL;
 END $$;
 
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts;
+EXCEPTION
+  WHEN duplicate_object THEN
+    NULL;
+  WHEN undefined_object THEN
+    NULL;
+END $$;
+
+
 -- 6. SEED DATA
 DO $$
 DECLARE

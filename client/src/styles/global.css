@@ -632,3 +632,91 @@ body {
     transform: translateY(0);
   }
 }
+
+/* App Notification Banner & Center Animations */
+@keyframes slideDownBanner {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -40px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes popoverIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+.app-notification-banner {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.app-notification-banner:hover {
+  transform: translate(-50%, 2px) !important;
+}
+
+.notification-center-popover {
+  border: 1px solid var(--border-subtle);
+}
+
+.notification-center-popover ::-webkit-scrollbar {
+  width: 5px;
+}
+
+.notification-center-popover ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notification-center-popover ::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 9999px;
+}
+
+/* Notification Badge on Nav / Topbar */
+.notification-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background-color: var(--rose);
+  color: #ffffff;
+  font-size: 0.625rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 0 0 1.5px #ffffff;
+}
+
