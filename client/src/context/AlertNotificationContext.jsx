@@ -149,26 +149,9 @@ export function AlertNotificationProvider({ children }) {
           }
         }
       } else {
-        // Initial load: populate known IDs
+        // Initial load: populate known IDs without popping up historical alerts
         fetchedAlerts.forEach((a) => knownAlertIdsRef.current.add(a.id));
         initialLoadDoneRef.current = true;
-
-        // If there's an unacknowledged critical alert within the last 30 minutes, pop it up
-        const dismissed = new Set(getStoredArray(STORAGE_KEY_DISMISSED));
-        const readIds = new Set(getStoredArray(STORAGE_KEY_READ));
-        const urgentUnread = fetchedAlerts.find(
-          (a) =>
-            (a.severity === 'critical' || a.severity === 'warning') &&
-            !dismissed.has(a.id) &&
-            !readIds.has(a.id)
-        );
-
-        if (urgentUnread) {
-          // Delay presentation slightly so initial page render is smooth
-          setTimeout(() => {
-            presentAlertNotification(urgentUnread, false);
-          }, 1200);
-        }
       }
     } catch (err) {
       console.warn('[AlertNotificationContext] Error fetching alerts:', err);

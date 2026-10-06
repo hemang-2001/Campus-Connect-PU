@@ -6,17 +6,11 @@ import Badge from '../components/Badge';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
 import {
-  Bell,
-  BellRing,
   AlertTriangle,
   AlertCircle,
   Info,
   PlusCircle,
-  CheckCircle,
   Clock,
-  Volume2,
-  VolumeX,
-  Sparkles,
   CheckCheck
 } from 'lucide-react';
 
@@ -27,13 +21,9 @@ export default function Alerts() {
     unreadCount,
     markAsRead,
     markAllAsRead,
-    notificationPermission,
-    requestSystemPermission,
-    soundEnabled,
-    toggleSound,
-    triggerTestAlert,
     fetchAlerts
   } = useAlertNotifications();
+
 
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -143,110 +133,6 @@ export default function Alerts() {
         </div>
       </div>
 
-      {/* App Notification Banner & Push Settings Control Card */}
-      <div
-        className="card mb-3"
-        style={{
-          padding: '12px 14px',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
-          border: '1px solid #dbeafe'
-        }}
-      >
-        <div className="flex-between mb-2">
-          <div className="flex-row">
-            <div
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--blue)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff'
-              }}
-            >
-              <BellRing size={16} />
-            </div>
-            <div>
-              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--gray-900)' }}>
-                Live App Notifications
-              </span>
-              <p style={{ fontSize: '0.7rem', color: 'var(--gray-600)' }}>
-                Floating heads-up alerts with sound, vibration & push
-              </p>
-            </div>
-          </div>
-
-          {/* Sound Mute/Unmute */}
-          <button
-            type="button"
-            className="btn btn-outline"
-            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-            onClick={toggleSound}
-            title={soundEnabled ? 'Chime sound is active' : 'Chime sound is muted'}
-          >
-            {soundEnabled ? <Volume2 size={14} color="var(--blue)" /> : <VolumeX size={14} />}
-            <span>{soundEnabled ? 'Chime ON' : 'Muted'}</span>
-          </button>
-        </div>
-
-        {/* Status & Quick Actions */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
-          {notificationPermission !== 'granted' ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              style={{ fontSize: '0.75rem', padding: '5px 10px', backgroundColor: 'var(--blue)' }}
-              onClick={requestSystemPermission}
-            >
-              <Bell size={13} />
-              <span>Enable Browser Push</span>
-            </button>
-          ) : (
-            <span
-              style={{
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                color: 'var(--emerald)',
-                backgroundColor: 'var(--emerald-light)',
-                padding: '4px 8px',
-                borderRadius: '6px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}
-            >
-              <CheckCircle size={12} />
-              <span>System Push Active</span>
-            </span>
-          )}
-
-          {/* Test Buttons to simulate mobile notifications */}
-          <button
-            type="button"
-            className="btn btn-outline"
-            style={{ fontSize: '0.75rem', padding: '5px 10px' }}
-            onClick={() => triggerTestAlert('warning')}
-            title="Simulate delay alert notification banner"
-          >
-            <Sparkles size={13} color="var(--amber)" />
-            <span>Test Warning Alert</span>
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-outline"
-            style={{ fontSize: '0.75rem', padding: '5px 10px' }}
-            onClick={() => triggerTestAlert('critical')}
-            title="Simulate critical emergency alert notification banner"
-          >
-            <Sparkles size={13} color="var(--rose)" />
-            <span>Test Critical Alert</span>
-          </button>
-        </div>
-      </div>
 
       {/* Admin Quick Post Form */}
       {role === 'admin' && showCreate && (

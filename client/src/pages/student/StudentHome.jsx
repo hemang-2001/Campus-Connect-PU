@@ -1,20 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import MapView from '../../components/MapView';
 import BusCard from '../../components/BusCard';
 import Loader from '../../components/Loader';
 import ErrorState from '../../components/ErrorState';
 import { useBusLocations, FALLBACK_STOPS } from '../../hooks/useBusLocations';
-import { useAlertNotifications } from '../../context/AlertNotificationContext';
 import { supabase } from '../../lib/supabaseClient';
 import { getBusETA } from '../../lib/eta';
-import { RefreshCw, Navigation, MapPin, Clock, AlertTriangle, AlertCircle, ChevronRight } from 'lucide-react';
+import { RefreshCw, Navigation, MapPin, Clock } from 'lucide-react';
 
 export default function StudentHome() {
-  const navigate = useNavigate();
-  const { alerts } = useAlertNotifications();
-  const urgentAlert = alerts.find((a) => a.severity === 'critical' || a.severity === 'warning');
-
   const {
     buses,
     loading,
@@ -25,6 +19,7 @@ export default function StudentHome() {
     selectedBus,
     getStopsForBus
   } = useBusLocations();
+
 
   const [stops, setStops] = useState([]);
   const [loadingStops, setLoadingStops] = useState(false);
@@ -87,67 +82,14 @@ export default function StudentHome() {
 
       {/* Shuttle Drawer / Cards Section */}
       <div style={{ padding: '16px' }}>
-        {/* Active Urgent Transit Alert Ribbon */}
-        {urgentAlert && (
-          <div
-            className="card mb-3 card-interactive"
-            onClick={() => navigate('/alerts')}
-            style={{
-              padding: '10px 14px',
-              backgroundColor: urgentAlert.severity === 'critical' ? 'var(--rose-light)' : 'var(--amber-light)',
-              border: `1px solid ${urgentAlert.severity === 'critical' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              {urgentAlert.severity === 'critical' ? (
-                <AlertCircle size={18} color="var(--rose)" style={{ flexShrink: 0 }} />
-              ) : (
-                <AlertTriangle size={18} color="var(--amber)" style={{ flexShrink: 0 }} />
-              )}
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    textTransform: 'uppercase',
-                    color: urgentAlert.severity === 'critical' ? 'var(--rose)' : '#b45309'
-                  }}
-                >
-                  Campus Alert Active
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.8125rem',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    color: 'var(--gray-900)'
-                  }}
-                >
-                  {urgentAlert.title}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--blue)' }}>View</span>
-              <ChevronRight size={14} color="var(--blue)" />
-            </div>
-          </div>
-        )}
-
         <div className="flex-between mb-3">
           <div>
             <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>Campus Shuttles</h2>
             <p className="text-xs text-muted">
-              {liveCount} Live • {mockCount} Simulated • {buses.length} Fleet Total
+              {liveCount} Live • {buses.length} Fleet Total
             </p>
           </div>
+
 
 
           <button
