@@ -179,3 +179,73 @@ export function getBusETA(bus, stops = []) {
     isOffline: false
   };
 }
+
+/**
+ * Finds the nearest bus stop to given coordinates
+ * @param {{ lat: number, lng: number }} userCoords
+ * @param {Array} stops
+ * @returns {object | null}
+ */
+export function findNearestStop(userCoords, stops = []) {
+  if (!userCoords?.lat || !userCoords?.lng || !stops || stops.length === 0) {
+    return null;
+  }
+  let minDistance = Infinity;
+  let nearest = null;
+
+  for (const stop of stops) {
+    if (stop.lat && stop.lng) {
+      const dist = getDistanceMeters(userCoords.lat, userCoords.lng, stop.lat, stop.lng);
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearest = {
+          ...stop,
+          distanceMeters: Math.round(dist),
+          distanceText: dist < 1000 ? `${Math.round(dist)} m` : `${(dist / 1000).toFixed(1)} km`,
+          walkTimeMinutes: Math.max(1, Math.round(dist / 80)) // ~80m/min walk speed
+        };
+      }
+    }
+  }
+  return nearest;
+}
+
+/**
+ * Finds the closest active bus approaching or closest to a target stop
+ * @param {object} targetStop
+ * @param {Array} buses
+ * @returns {object | null}
+ */
+export function getClosestBusToStop(targetStop, buses = []) {
+  if (!targetStop?.lat || !targetStop?.lng || !buses || buses.length === 0) {
+    return null;
+  }
+
+  const activeBuses = buses.filter(
+    (b) => b.status && b.status.toUpperCase() !== 'OFFLINE' && b.location?.lat && b.location?.lng
+  );
+
+  if (activeBuses.length === 0) return null;
+
+  let closestBus = null;
+  let minDistance = Infinity;
+
+  for (const bus of activeBuses) {
+    const dist = getDistanceMeters(bus.location.lat, bus.location.lng, targetStop.lat, targetStop.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      closestBus = bus;
+    }
+  }
+
+  if (!closestBus) return null;
+
+  const eta = calculateETA(minDistance, closestBus.location?.speed_kmh || 0);
+
+  return {
+    bus: closestBus,
+    distanceMeters: Math.round(minDistance),
+    ...eta
+  };
+}
+

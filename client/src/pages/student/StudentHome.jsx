@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import MapView from '../../components/MapView';
 import BusCard from '../../components/BusCard';
 import Loader from '../../components/Loader';
 import ErrorState from '../../components/ErrorState';
 import { useBusLocations, FALLBACK_STOPS } from '../../hooks/useBusLocations';
 import { supabase } from '../../lib/supabaseClient';
-import { getBusETA } from '../../lib/eta';
-import { RefreshCw, Navigation, MapPin, Clock } from 'lucide-react';
+import { getBusETA, findNearestStop, getClosestBusToStop } from '../../lib/eta';
+import { RefreshCw, Navigation, MapPin, Clock, Bus } from 'lucide-react';
+
+const CAMPUS_PRESETS = [
+  { label: '🏛️ Main Gate 1', name: 'University Main Gate 1', lat: 12.019596, lng: 79.859077 },
+  { label: '📚 Library / MBA', name: 'Reading Room/MBA Department', lat: 12.020898, lng: 79.855204 },
+  { label: '🏥 Health Center', name: 'Health Care Center', lat: 12.019434, lng: 79.850250 },
+  { label: '🎭 Open Air Theatre', name: 'Open Air Theatre', lat: 12.026560, lng: 79.847402 },
+  { label: '🏨 Hostel Mess', name: 'Mother Teresa Mess', lat: 12.022298, lng: 79.847990 },
+  { label: '🎓 Silver Jubilee', name: 'Silver Jubilee Campus', lat: 12.033146, lng: 79.857535 }
+];
 
 export default function StudentHome() {
   const {
@@ -20,10 +29,20 @@ export default function StudentHome() {
     getStopsForBus
   } = useBusLocations();
 
-
   const [stops, setStops] = useState([]);
   const [loadingStops, setLoadingStops] = useState(false);
 
+  // User location defaults to campus center / Main Gate so nearest stop is immediately available
+  const [userLocation, setUserLocation] = useState(() => {
+    try {
+      const saved = localStorage.getItem('campus_connect_user_loc');
+      return saved ? JSON.parse(saved) : CAMPUS_PRESETS[0];
+    } catch {
+      return CAMPUS_PRESETS[0];
+    }
+  });
+
+  const [focusTarget, setFocusTarget] = useState(null);
 
   // When selected bus changes, load its route's stops
   useEffect(() => {
@@ -58,6 +77,53 @@ export default function StudentHome() {
     loadStops();
   }, [selectedBus?.route?.id, selectedBus?.route?.name]);
 
+  const handleUserLocationChange = (newLoc) => {
+    setUserLocation(newLoc);
+    try {
+      localStorage.setItem('campus_connect_user_loc', JSON.stringify(newLoc));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleSelectPreset = (preset) => {
+    const loc = {
+      lat: preset.lat,
+      lng: preset.lng,
+      accuracy: 10,
+      source: 'preset',
+      name: preset.name
+    };
+    handleUserLocationChange(loc);
+    setFocusTarget({
+      lat: preset.lat,
+      lng: preset.lng,
+      zoom: 16,
+      timestamp: Date.now()
+    });
+  };
+
+  // Find nearest stop from user location
+  const nearestStop = useMemo(() => {
+    return findNearestStop(userLocation, stops);
+  }, [userLocation, stops]);
+
+  // Find closest approaching bus to the nearest stop
+  const closestBusInfo = useMemo(() => {
+    return getClosestBusToStop(nearestStop, buses);
+  }, [nearestStop, buses]);
+
+  const handleFocusNearestStop = () => {
+    if (nearestStop?.lat && nearestStop?.lng) {
+      setFocusTarget({
+        lat: nearestStop.lat,
+        lng: nearestStop.lng,
+        zoom: 17,
+        timestamp: Date.now()
+      });
+    }
+  };
+
   if (loading) {
     return <Loader message="Locating campus shuttles..." />;
   }
@@ -78,10 +144,177 @@ export default function StudentHome() {
         stops={stops}
         selectedBus={selectedBus}
         onSelectBus={(bus) => setSelectedBusId(bus.id)}
+        userLocation={userLocation}
+        onUserLocationChange={handleUserLocationChange}
+        nearestStop={nearestStop}
+        focusTarget={focusTarget}
       />
 
       {/* Shuttle Drawer / Cards Section */}
       <div style={{ padding: '16px' }}>
+        {/* Nearest Bus Stop Interactive Card */}
+        <div className={`card mb-3 ${nearestStop ? 'nearest-stop-card' : 'nearest-stop-card idle'}`}>
+          <div className="flex-between mb-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  backgroundColor: '#10b981',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                }}
+              >
+                <MapPin size={18} />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    color: '#047857',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Nearest Campus Bus Stop
+                </div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '1px 0' }}>
+                  {nearestStop ? nearestStop.name : 'University Main Gate 1'}
+                </h3>
+                <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+                  From: <strong>{userLocation?.name || 'Your Location'}</strong>
+                </div>
+              </div>
+            </div>
+
+            {nearestStop && (
+              <div style={{ textAlign: 'right' }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    padding: '4px 10px',
+                    backgroundColor: '#d1fae5',
+                    color: '#065f46',
+                    borderRadius: '9999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 800
+                  }}
+                >
+                  {nearestStop.distanceText || `${nearestStop.distanceMeters}m`}
+                </span>
+                <div style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600, marginTop: '2px' }}>
+                  ~{nearestStop.walkTimeMinutes} min walk
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Closest Bus to this stop */}
+          {closestBusInfo ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                marginTop: '6px',
+                fontSize: '0.8125rem',
+                border: '1px solid rgba(16, 185, 129, 0.25)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Bus size={15} style={{ color: '#2563eb' }} />
+                <span>
+                  Approaching Bus: <strong>{closestBusInfo.bus.plate_no}</strong> ({closestBusInfo.bus.route?.name || 'Campus Shuttle'})
+                </span>
+              </div>
+              <span
+                style={{
+                  fontWeight: 800,
+                  color: closestBusInfo.isArriving ? '#059669' : '#2563eb',
+                  backgroundColor: closestBusInfo.isArriving ? '#ecfdf5' : '#eff6ff',
+                  padding: '2px 8px',
+                  borderRadius: '4px'
+                }}
+              >
+                {closestBusInfo.etaText}
+              </span>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                marginTop: '6px',
+                fontSize: '0.75rem',
+                color: '#64748b'
+              }}
+            >
+              <Clock size={13} />
+              <span>Monitoring shuttles approaching this stop...</span>
+            </div>
+          )}
+
+          {/* Actions & Landmark Quick Selectors */}
+          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(16, 185, 129, 0.15)' }}>
+            <div className="flex-between mb-1">
+              <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 700 }}>
+                📍 Change your spot (or tap directly on map):
+              </span>
+              {nearestStop && (
+                <button
+                  type="button"
+                  onClick={handleFocusNearestStop}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#059669',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  View Stop on Map &rarr;
+                </button>
+              )}
+            </div>
+
+            <div className="preset-pills-wrap">
+              {CAMPUS_PRESETS.map((preset) => {
+                const isSelected =
+                  userLocation?.name === preset.name ||
+                  (userLocation &&
+                    Math.abs(userLocation.lat - preset.lat) < 0.0001 &&
+                    Math.abs(userLocation.lng - preset.lng) < 0.0001);
+
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    className={`preset-pill ${isSelected ? 'active' : ''}`}
+                    onClick={() => handleSelectPreset(preset)}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         <div className="flex-between mb-3">
           <div>
             <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>Campus Shuttles</h2>
@@ -89,8 +322,6 @@ export default function StudentHome() {
               {liveCount} Live • {buses.length} Fleet Total
             </p>
           </div>
-
-
 
           <button
             type="button"
