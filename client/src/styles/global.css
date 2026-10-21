@@ -537,6 +537,132 @@ body {
   100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0), 0 4px 10px rgba(0, 0, 0, 0.2); }
 }
 
+/* User Location Marker & Pulse */
+.custom-user-marker {
+  background: transparent;
+  border: none;
+}
+
+.user-marker-container {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-marker-pulse {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.35);
+  animation: user-radar 2s ease-out infinite;
+}
+
+.user-marker-dot {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  background-color: #2563eb;
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+
+@keyframes user-radar {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* Floating "Locate Me" Button */
+.map-locate-btn {
+  position: absolute;
+  bottom: 20px;
+  right: 14px;
+  z-index: 400;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+}
+
+.map-locate-btn:hover {
+  background: #f8fafc;
+  color: #1e293b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.map-locate-btn:active {
+  transform: scale(0.94);
+}
+
+.map-locate-btn.active {
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.map-locate-btn.locating {
+  border-color: #93c5fd;
+}
+
+/* Map Toast Notification */
+.map-locate-toast {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  background: rgba(15, 23, 42, 0.88);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: mapToastFadeIn 0.2s ease-out;
+}
+
+@keyframes mapToastFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+
 /* States: Loader, Empty, Error */
 .state-container {
   display: flex;
@@ -637,11 +763,22 @@ body {
 @keyframes slideDownBanner {
   0% {
     opacity: 0;
-    transform: translate(-50%, -40px) scale(0.96);
+    transform: translateY(-28px) scale(0.97);
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes popoverInMobile {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -676,16 +813,128 @@ body {
   }
 }
 
+/* Floating Heads-Up Mobile Notification Banner */
 .app-notification-banner {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  position: fixed;
+  top: calc(10px + var(--safe-top));
+  left: 12px;
+  right: 12px;
+  margin-left: auto;
+  margin-right: auto;
+  width: calc(100% - 24px);
+  max-width: 460px;
+  box-sizing: border-box;
+  z-index: 10000;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, opacity 0.2s ease;
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.app-notification-banner:hover {
-  transform: translate(-50%, 2px) !important;
+@media (max-width: 380px) {
+  .app-notification-banner {
+    left: 8px;
+    right: 8px;
+    width: calc(100% - 16px);
+  }
 }
 
+/* Subtle desktop-only hover lift (prevents sticky hover bug on touchscreens) */
+@media (hover: hover) and (pointer: fine) {
+  .app-notification-banner:hover {
+    transform: translateY(2px);
+  }
+}
+
+/* Notification Center Mobile Backdrop */
+.notification-center-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+/* Floating Notification Center Dropdown / Sheet */
 .notification-center-popover {
+  position: fixed;
+  top: calc(64px + var(--safe-top));
+  left: 12px;
+  right: 12px;
+  margin: 0 auto;
+  width: auto;
+  max-width: 430px;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.08);
   border: 1px solid var(--border-subtle);
+  z-index: 10001;
+  overflow: hidden;
+  animation: popoverInMobile 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 641px) {
+  .notification-center-backdrop {
+    display: none;
+  }
+  .notification-center-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    margin: 0;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    animation: popoverIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+.notification-center-list {
+  max-height: min(320px, calc(100vh - 240px));
+  overflow-y: auto;
+  padding: 6px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.notification-controls-bar {
+  padding: 8px 12px;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 0.72rem;
+  overflow-x: auto;
+}
+
+.notification-control-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+@media (max-width: 380px) {
+  .notification-controls-bar {
+    gap: 4px;
+    padding: 6px 8px;
+  }
+  .notification-control-btn {
+    padding: 4px 6px;
+    font-size: 0.68rem;
+  }
 }
 
 .notification-center-popover ::-webkit-scrollbar {

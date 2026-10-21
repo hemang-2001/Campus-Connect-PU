@@ -132,185 +132,164 @@ export default function NotificationCenter() {
 
       {/* Popover / Drawer */}
       {isOpen && (
-        <div
-          className="notification-center-popover"
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            right: '-10px',
-            width: '340px',
-            maxWidth: 'calc(100vw - 32px)',
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            boxShadow: '0 15px 30px -5px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.08)',
-            zIndex: 10001,
-            overflow: 'hidden',
-            animation: 'popoverIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}
-        >
-          {/* Header */}
+        <>
+          {/* Mobile backdrop for tap-outside to close */}
           <div
-            style={{
-              padding: '12px 14px',
-              backgroundColor: 'var(--gray-50)',
-              borderBottom: '1px solid var(--border-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}
+            className="notification-center-backdrop"
+            onClick={() => setIsOpen(false)}
+            aria-hidden="true"
+          />
+
+          <div
+            className="notification-center-popover"
+            role="dialog"
+            aria-label="Student Alert Notifications"
           >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <h3 style={{ fontSize: '0.875rem', fontWeight: 800 }}>Student Alerts</h3>
+            {/* Header */}
+            <div
+              style={{
+                padding: '12px 14px',
+                backgroundColor: 'var(--gray-50)',
+                borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px'
+              }}
+            >
+              <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <h3 style={{ fontSize: '0.875rem', fontWeight: 800, whiteSpace: 'nowrap' }}>Student Alerts</h3>
+                  {unreadCount > 0 && (
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        backgroundColor: 'var(--blue-light)',
+                        color: 'var(--blue)',
+                        padding: '2px 6px',
+                        borderRadius: '6px',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                      }}
+                    >
+                      {unreadCount} unread
+                    </span>
+                  )}
+                </div>
+                <p
+                  style={{
+                    fontSize: '0.7rem',
+                    color: 'var(--text-muted)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    margin: 0
+                  }}
+                >
+                  Real-time shuttle notifications
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                 {unreadCount > 0 && (
-                  <span
+                  <button
+                    type="button"
+                    onClick={markAllAsRead}
+                    title="Mark all as read"
                     style={{
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      backgroundColor: 'var(--blue-light)',
+                      background: 'none',
+                      border: 'none',
                       color: 'var(--blue)',
-                      padding: '2px 6px',
-                      borderRadius: '6px'
+                      cursor: 'pointer',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      padding: '4px 6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    {unreadCount} unread
-                  </span>
+                    <CheckCheck size={14} />
+                    <span>Read all</span>
+                  </button>
                 )}
-              </div>
-              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Real-time shuttle notifications</p>
-            </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {unreadCount > 0 && (
                 <button
                   type="button"
-                  onClick={markAllAsRead}
-                  title="Mark all as read"
+                  onClick={() => setIsOpen(false)}
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: 'var(--blue)',
+                    color: 'var(--gray-400)',
                     cursor: 'pointer',
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    padding: '4px 6px',
+                    padding: '4px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    justifyContent: 'center',
+                    borderRadius: '6px'
                   }}
+                  aria-label="Close notifications"
                 >
-                  <CheckCheck size={14} />
-                  <span>Read all</span>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Controls Bar: Sound, System Notification, Test */}
+            <div className="notification-controls-bar">
+              {/* Audio Toggle */}
+              <button
+                type="button"
+                onClick={toggleSound}
+                className="notification-control-btn"
+                style={{
+                  background: soundEnabled ? 'var(--blue-light)' : 'var(--gray-100)',
+                  color: soundEnabled ? 'var(--blue)' : 'var(--gray-600)'
+                }}
+                title={soundEnabled ? 'Alert chime enabled' : 'Alert chime muted'}
+              >
+                {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                <span>{soundEnabled ? 'Chime ON' : 'Muted'}</span>
+              </button>
+
+              {/* Browser Push Permission Toggle */}
+              {notificationPermission !== 'granted' && (
+                <button
+                  type="button"
+                  onClick={requestSystemPermission}
+                  className="notification-control-btn"
+                  style={{
+                    background: 'var(--amber-light)',
+                    color: '#b45309',
+                    border: '1px solid rgba(245, 158, 11, 0.3)'
+                  }}
+                  title="Enable OS system push notifications"
+                >
+                  <Bell size={12} />
+                  <span>Enable Push</span>
                 </button>
               )}
 
+              {/* Test Alert Simulator Button */}
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={() => triggerTestAlert('warning')}
+                className="notification-control-btn"
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--gray-400)',
-                  cursor: 'pointer',
-                  padding: '4px'
+                  background: 'var(--gray-100)',
+                  color: 'var(--gray-700)'
                 }}
-                aria-label="Close notifications"
+                title="Test realistic mobile app alert notification"
               >
-                <X size={16} />
+                <Sparkles size={12} color="var(--amber)" />
+                <span>Test Alert</span>
               </button>
             </div>
-          </div>
 
-          {/* Controls Bar: Sound, System Notification, Test */}
-          <div
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#ffffff',
-              borderBottom: '1px solid var(--border-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '6px',
-              fontSize: '0.72rem'
-            }}
-          >
-            {/* Audio Toggle */}
-            <button
-              type="button"
-              onClick={toggleSound}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: soundEnabled ? 'var(--blue-light)' : 'var(--gray-100)',
-                color: soundEnabled ? 'var(--blue)' : 'var(--gray-600)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-              title={soundEnabled ? 'Alert chime enabled' : 'Alert chime muted'}
-            >
-              {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
-              <span>{soundEnabled ? 'Chime ON' : 'Muted'}</span>
-            </button>
-
-            {/* Browser Push Permission Toggle */}
-            {notificationPermission !== 'granted' && (
-              <button
-                type="button"
-                onClick={requestSystemPermission}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: 'var(--amber-light)',
-                  color: '#b45309',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  borderRadius: '6px',
-                  padding: '4px 8px',
-                  cursor: 'pointer',
-                  fontWeight: 600
-                }}
-                title="Enable OS system push notifications"
-              >
-                <Bell size={12} />
-                <span>Enable Push</span>
-              </button>
-            )}
-
-            {/* Test Alert Simulator Button */}
-            <button
-              type="button"
-              onClick={() => triggerTestAlert('warning')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: 'var(--gray-100)',
-                color: 'var(--gray-700)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-              title="Test realistic mobile app alert notification"
-            >
-              <Sparkles size={12} color="var(--amber)" />
-              <span>Test Alert</span>
-            </button>
-          </div>
-
-          {/* Alerts List */}
-          <div
-            style={{
-              maxHeight: '290px',
-              overflowY: 'auto',
-              padding: '6px 0'
-            }}
-          >
+            {/* Alerts List */}
+            <div className="notification-center-list">
             {alerts.length === 0 ? (
               <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
                 <Bell size={24} style={{ opacity: 0.4, margin: '0 auto 6px auto' }} />
@@ -446,6 +425,7 @@ export default function NotificationCenter() {
             </button>
           </div>
         </div>
+      </>
       )}
     </div>
   );
