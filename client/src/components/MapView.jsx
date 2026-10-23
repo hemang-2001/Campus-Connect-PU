@@ -119,7 +119,9 @@ export default function MapView({
   userLocation: externalUserLocation,
   onUserLocationChange,
   nearestStop: externalNearestStop,
-  focusTarget
+  focusTarget,
+  gpsStatus,
+  onRequestGps
 }) {
   // User location state (internal fallback if not controlled by parent)
   const [internalUserLocation, setInternalUserLocation] = useState(null);
@@ -132,6 +134,8 @@ export default function MapView({
   const toastTimeoutRef = useRef(null);
 
   const currentUserLocation = externalUserLocation !== undefined ? externalUserLocation : internalUserLocation;
+  const isLocatingState = gpsStatus ? gpsStatus === 'locating' : isLocating;
+  const isTrackingState = gpsStatus ? gpsStatus === 'active' : isTracking;
 
   const showToast = useCallback((message) => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -187,6 +191,15 @@ export default function MapView({
   // Compute selected bus ETA for stop markers
   const selectedEta = isSelectedActive ? getBusETA(selectedBus, stops) : null;
 
+  // Check if walking path is on campus (< 50 km)
+  const isWalkingPathDisplayable = useMemo(() => {
+    if (!currentUserLocation?.lat || !currentUserLocation?.lng || !currentNearestStop?.lat || !currentNearestStop?.lng) {
+      return false;
+    }
+    const d = getDistanceMeters(currentUserLocation.lat, currentUserLocation.lng, currentNearestStop.lat, currentNearestStop.lng);
+    return d < 50000;
+  }, [currentUserLocation, currentNearestStop]);
+
   // Extract stops polyline coordinates
   const stopCoordinates = stops && stops.length > 0
     ? stops.map((s) => [s.lat, s.lng])
@@ -194,8 +207,24 @@ export default function MapView({
 
   // Multi-tier GPS Locate Handler (satellite GPS -> network IP fallback)
   const handleLocateMe = useCallback(() => {
+    if (onRequestGps) {
+      onRequestGps();
+      if (currentUserLocation?.lat && currentUserLocation?.lng) {
+        setPanTarget({
+          lat: currentUserLocation.lat,
+          lng: currentUserLocation.lng,
+          zoom: 16,
+          timestamp: Date.now()
+        });
+        showToast('📍 Centered on your live GPS position');
+      } else {
+        showToast('📡 Acquiring live GPS position...');
+      }
+      return;
+    }
+
     if (!navigator.geolocation) {
-      showToast('GPS unavailable. Click anywhere on the map or pick a campus spot below.');
+      showToast('GPS unavailable. Click anywhere on the map to set your location.');
       return;
     }
 
@@ -323,14 +352,14 @@ export default function MapView({
       {/* Floating "Locate Me" Action Button */}
       <button
         type="button"
-        className={`map-locate-btn ${isLocating ? 'locating' : ''} ${isTracking ? 'active' : ''}`}
+        className={`map-locate-btn ${isLocatingState ? 'locating' : ''} ${isTrackingState ? 'active' : ''}`}
         onClick={handleLocateMe}
-        title={isTracking ? 'Re-center on my GPS' : 'Find where I am'}
+        title={isTrackingState ? 'Re-center on my GPS' : 'Find where I am'}
         aria-label="Find where I am"
       >
-        {isLocating ? (
+        {isLocatingState ? (
           <Loader2 size={20} className="spin" style={{ color: '#2563eb' }} />
-        ) : isTracking ? (
+        ) : isTrackingState ? (
           <LocateFixed size={20} style={{ color: '#2563eb' }} />
         ) : (
           <Locate size={20} />
@@ -365,8 +394,8 @@ export default function MapView({
           />
         )}
 
-        {/* Green Dotted Walking Path from User to Nearest Stop */}
-        {currentUserLocation && currentNearestStop?.lat && currentNearestStop?.lng && (
+        {/* Green Dotted Walking Path from User to Nearest Stop (within campus area) */}
+        {isWalkingPathDisplayable && (
           <Polyline
             positions={[
               [currentUserLocation.lat, currentUserLocation.lng],

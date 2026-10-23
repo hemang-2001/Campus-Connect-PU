@@ -24,6 +24,7 @@ export const FALLBACK_STOPS = {
  */
 export function useBusLocations() {
   const [buses, setBuses] = useState([]);
+  const [allStops, setAllStops] = useState([]);
   const [stopsByRoute, setStopsByRoute] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,10 +39,11 @@ export function useBusLocations() {
       try {
         const { data, error: stopErr } = await supabase
           .from('bus_stops')
-          .select('*')
+          .select('*, route:routes(id, name, color)')
           .order('seq', { ascending: true });
 
         if (!stopErr && data && data.length > 0) {
+          setAllStops(data);
           const grouped = {};
           data.forEach((stop) => {
             if (!grouped[stop.route_id]) {
@@ -50,6 +52,18 @@ export function useBusLocations() {
             grouped[stop.route_id].push(stop);
           });
           setStopsByRoute(grouped);
+        } else {
+          const fallbackList = [
+            ...FALLBACK_STOPS.default.map((s) => ({
+              ...s,
+              route: { name: 'Route 1 Library - SJ Campus', color: '#2563eb' }
+            })),
+            ...FALLBACK_STOPS.hostel.map((s) => ({
+              ...s,
+              route: { name: 'Route 2 SJ Campus - Library', color: '#8e7cc3' }
+            }))
+          ];
+          setAllStops(fallbackList);
         }
       } catch (err) {
         console.warn('Could not pre-load all route stops:', err);
@@ -233,6 +247,7 @@ export function useBusLocations() {
 
   return {
     buses,
+    allStops,
     stopsByRoute,
     getStopsForBus,
     loading,
