@@ -19,19 +19,10 @@ import {
   Radio,
   Sparkles
 } from 'lucide-react';
-import { getBusETA, getDistanceMeters, findNearestStop } from '../lib/eta';
+import { getBusETA, getDistanceMeters } from '../lib/eta';
 
-// Authentic Pondicherry University Central Campus Location (Default starting anchor)
-const DEFAULT_CAMPUS_LOCATION = {
-  lat: 12.020898,
-  lng: 79.855204, // Central Library / MBA Department
-  accuracy: 15,
-  heading: 0,
-  speed: 0,
-  source: 'campus_default',
-  name: 'Central Library / MBA (Campus)',
-  timestamp: Date.now()
-};
+// Default Pondicherry University Campus Center Anchor (Used ONLY for initial map viewport when GPS is loading)
+const PONDICHERRY_CAMPUS_CENTER = [12.0235, 79.8535];
 
 // Map Camera Controller: smoothly handles focusing and following without snapping back!
 function MapCameraController({
@@ -51,7 +42,7 @@ function MapCameraController({
     onMapReady?.(map);
   }, [map, onMapReady]);
 
-  // 1. Explicit Focus Target (User Location, Nearest Stop, Focus Bus, Landmark)
+  // 1. Explicit Focus Target (User Location, Nearest Stop, Focus Bus)
   useEffect(() => {
     if (focusTarget && focusTarget.lat && focusTarget.lng) {
       const isNewTarget =
@@ -99,31 +90,12 @@ function MapCameraController({
       onUserMapInteraction?.('drag');
     },
     zoomstart(e) {
-      // Pause follow if triggered by user gesture (not programmatic flyTo)
       if (e.originalEvent) {
         onUserMapInteraction?.('zoom');
       }
     }
   });
 
-  return null;
-}
-
-// Allows user to click anywhere on map to drop a pin
-function MapClickHandler({ onSelectLocation }) {
-  useMapEvents({
-    click(e) {
-      if (e?.latlng?.lat && e?.latlng?.lng) {
-        onSelectLocation({
-          lat: e.latlng.lat,
-          lng: e.latlng.lng,
-          accuracy: 10,
-          source: 'manual',
-          name: 'Custom Pinned Spot'
-        });
-      }
-    }
-  });
   return null;
 }
 
@@ -177,11 +149,11 @@ function createStopIcon(seq, isNext = false, isNearest = false) {
   });
 }
 
-// Custom DivIcon for User Current Location (High-visibility Pin with Callout Badge)
-function createUserIcon(locationName = 'You are here') {
-  const shortName = locationName && locationName.length > 20
-    ? `${locationName.substring(0, 18)}...`
-    : (locationName || 'You are here');
+// Custom DivIcon for Authentic User GPS Location (High-visibility Pin with Radar Pulse)
+function createGpsUserIcon(locationName = 'My GPS Location') {
+  const shortName = locationName && locationName.length > 22
+    ? `${locationName.substring(0, 20)}...`
+    : (locationName || 'My GPS Location');
 
   return L.divIcon({
     className: 'custom-user-marker',
@@ -189,7 +161,7 @@ function createUserIcon(locationName = 'You are here') {
     iconAnchor: [60, 52],
     popupAnchor: [0, -52],
     html: `
-      <div class="user-marker-pin-wrap">
+      <div class="user-marker-pin-wrap" style="cursor: pointer;">
         <div class="user-marker-callout">
           <span class="user-marker-callout-dot"></span>
           <span>${shortName}</span>
@@ -214,15 +186,12 @@ export default function MapView({
   allStops = [],
   selectedBus,
   onSelectBus,
-  userLocation: externalUserLocation,
-  onUserLocationChange,
-  nearestStop: externalNearestStop,
+  userLocation,
+  nearestStop,
   focusTarget: externalFocusTarget,
   gpsStatus,
   onRequestGps
 }) {
-  // Internal fallback state (never null!)
-  const [internalUserLocation, setInternalUserLocation] = useState(DEFAULT_CAMPUS_LOCATION);
   const [internalFocusTarget, setInternalFocusTarget] = useState(null);
   const [isFollowingBus, setIsFollowingBus] = useState(false);
   const [followPaused, setFollowPaused] = useState(false);
@@ -232,11 +201,11 @@ export default function MapView({
   const mapInstanceRef = useRef(null);
   const toastTimeoutRef = useRef(null);
 
-  // Effective user location: external prop prioritized, else internal fallback, guaranteed never null!
-  const effectiveUserLocation = externalUserLocation || internalUserLocation || DEFAULT_CAMPUS_LOCATION;
+  // User location is STRICTLY the user's authentic device GPS (or null if not yet locked)
+  const effectiveUserLocation = (userLocation?.lat && userLocation?.lng) ? userLocation : null;
 
-  const isLocatingState = gpsStatus ? gpsStatus === 'locating' : false;
-  const isTrackingState = gpsStatus ? gpsStatus === 'active' : false;
+  const isLocatingState = gpsStatus === 'locating';
+  const isTrackingState = gpsStatus === 'active' && effectiveUserLocation !== null;
 
   // Active focus target prioritizes external then internal
   const activeFocusTarget = externalFocusTarget || internalFocusTarget;
@@ -248,20 +217,6 @@ export default function MapView({
       setToast(null);
     }, 3200);
   }, []);
-
-  const setUserLocationUnified = useCallback((newLoc) => {
-    setInternalUserLocation(newLoc);
-    onUserLocationChange?.(newLoc);
-  }, [onUserLocationChange]);
-
-  // Compute nearest bus stop if not supplied by parent (always succeeds since user location is never null!)
-  const computedNearestStop = useMemo(() => {
-    const stopPool = stops && stops.length > 0 ? stops : (allStops && allStops.length > 0 ? allStops : []);
-    if (!effectiveUserLocation || stopPool.length === 0) return null;
-    return findNearestStop(effectiveUserLocation, stopPool);
-  }, [effectiveUserLocation, stops, allStops]);
-
-  const currentNearestStop = externalNearestStop || computedNearestStop;
 
   // Filter out offline buses from active map view
   const visibleBuses = useMemo(() => {
@@ -279,32 +234,32 @@ export default function MapView({
   );
   const targetBus = isSelectedActive ? selectedBus : (visibleBuses[0] || null);
 
-  // Initial center: centers on student's location on campus on initial load
+  // Initial center: if GPS is active center on user, else center on Pondicherry University campus
   const initialMapCenter = useMemo(() => {
     if (effectiveUserLocation?.lat && effectiveUserLocation?.lng) {
       return [effectiveUserLocation.lat, effectiveUserLocation.lng];
     }
-    return [DEFAULT_CAMPUS_LOCATION.lat, DEFAULT_CAMPUS_LOCATION.lng];
+    return PONDICHERRY_CAMPUS_CENTER;
   }, []);
 
   // Selected bus ETA calculation
   const selectedEta = isSelectedActive ? getBusETA(selectedBus, stops) : null;
 
-  // Walking path to nearest stop (within campus distance)
+  // Walking path to nearest stop (displayable when GPS is active & nearest stop is available)
   const isWalkingPathDisplayable = useMemo(() => {
-    if (!effectiveUserLocation?.lat || !effectiveUserLocation?.lng || !currentNearestStop?.lat || !currentNearestStop?.lng) {
+    if (!effectiveUserLocation?.lat || !effectiveUserLocation?.lng || !nearestStop?.lat || !nearestStop?.lng) {
       return false;
     }
-    const d = getDistanceMeters(effectiveUserLocation.lat, effectiveUserLocation.lng, currentNearestStop.lat, currentNearestStop.lng);
+    const d = getDistanceMeters(effectiveUserLocation.lat, effectiveUserLocation.lng, nearestStop.lat, nearestStop.lng);
     return d < 50000;
-  }, [effectiveUserLocation, currentNearestStop]);
+  }, [effectiveUserLocation, nearestStop]);
 
   // Route Polyline coordinates
   const stopCoordinates = useMemo(() => {
     return stops && stops.length > 0 ? stops.map((s) => [s.lat, s.lng]) : [];
   }, [stops]);
 
-  // Compute distance from user to selected bus
+  // Compute distance from user GPS to selected bus
   const distanceToSelectedBus = useMemo(() => {
     if (!effectiveUserLocation || !targetBus?.location?.lat || !targetBus?.location?.lng) return null;
     const d = getDistanceMeters(
@@ -325,25 +280,22 @@ export default function MapView({
     }
   }, [isFollowingBus, showToast]);
 
-  // Action: Center on User Location
+  // Action: Center on User GPS Location
   const handleLocateMe = useCallback(() => {
     setIsFollowingBus(false);
     setFollowPaused(false);
-
-    if (onRequestGps) {
-      onRequestGps();
-    }
 
     if (effectiveUserLocation?.lat && effectiveUserLocation?.lng) {
       setInternalFocusTarget({
         lat: effectiveUserLocation.lat,
         lng: effectiveUserLocation.lng,
-        zoom: 16,
+        zoom: 17,
         timestamp: Date.now()
       });
-      showToast('📍 Centered on your location');
+      showToast(`🛰️ Centered on your GPS (±${effectiveUserLocation.accuracy || 10}m)`);
     } else {
-      showToast('📡 Acquiring device location...');
+      onRequestGps?.();
+      showToast('📡 Acquiring fresh GPS satellite fix...');
     }
   }, [effectiveUserLocation, onRequestGps, showToast]);
 
@@ -383,8 +335,8 @@ export default function MapView({
 
   // Action: Focus Nearest Stop
   const handleFocusNearestStop = useCallback(() => {
-    if (!currentNearestStop?.lat || !currentNearestStop?.lng) {
-      showToast('No nearest stop identified yet');
+    if (!nearestStop?.lat || !nearestStop?.lng) {
+      showToast('Nearest stop will appear once GPS is locked');
       return;
     }
 
@@ -392,14 +344,14 @@ export default function MapView({
     setFollowPaused(false);
 
     setInternalFocusTarget({
-      lat: currentNearestStop.lat,
-      lng: currentNearestStop.lng,
+      lat: nearestStop.lat,
+      lng: nearestStop.lng,
       zoom: 17,
       timestamp: Date.now()
     });
 
-    showToast(`🚏 Nearest Stop: ${currentNearestStop.name}`);
-  }, [currentNearestStop, showToast]);
+    showToast(`🚏 Nearest Stop: ${nearestStop.name}`);
+  }, [nearestStop, showToast]);
 
   // Action: Fit Entire Campus / Route Overview
   const handleFitOverview = useCallback(() => {
@@ -436,28 +388,6 @@ export default function MapView({
     }
   }, [effectiveUserLocation, stops, visibleBuses, showToast]);
 
-  // Handle map click location pin
-  const handleMapLocationSelect = useCallback((point) => {
-    setIsFollowingBus(false);
-    setFollowPaused(false);
-    setUserLocationUnified(point);
-    showToast('📍 Pin moved! Nearest stop & walking time updated.');
-  }, [setUserLocationUnified, showToast]);
-
-  // Handle user marker dragging (interactive relocate!)
-  const handleMarkerDragEnd = useCallback((lat, lng) => {
-    const updated = {
-      lat,
-      lng,
-      accuracy: 10,
-      source: 'manual',
-      name: 'Custom Location Pin',
-      timestamp: Date.now()
-    };
-    setUserLocationUnified(updated);
-    showToast('📍 Location updated! Nearest stop recalculated.');
-  }, [setUserLocationUnified, showToast]);
-
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
@@ -482,7 +412,13 @@ export default function MapView({
           </button>
         ) : (
           <div className="map-crosshair-hint">
-            <span>💡 Drag your blue pin or tap map to change spot</span>
+            <span>
+              {effectiveUserLocation
+                ? `🛰️ Live GPS Active (±${effectiveUserLocation.accuracy || 10}m) • Tracking nearest stop`
+                : isLocatingState
+                ? '🛰️ Acquiring your device GPS location...'
+                : '📍 Tap "Me" to locate using your device GPS'}
+            </span>
           </div>
         )}
 
@@ -491,7 +427,7 @@ export default function MapView({
           type="button"
           className="map-top-action-btn"
           onClick={handleFitOverview}
-          title="Fit entire campus route & fleet on screen"
+          title="Fit campus route & fleet on screen"
           aria-label="Campus Overview"
         >
           <Maximize2 size={15} />
@@ -506,37 +442,37 @@ export default function MapView({
         </div>
       )}
 
-      {/* 3. Floating User ↔ Nearest Stop Live Status Bridge (Top-Center Floating Badge) */}
-      {currentNearestStop && (
+      {/* 3. Floating User GPS ↔ Nearest Stop Live Status Bridge (Top-Center Floating Badge) */}
+      {effectiveUserLocation && nearestStop && (
         <div className="map-user-stop-bridge">
-          <div className="bridge-pill" onClick={handleLocateMe} title="Center on your location">
+          <div className="bridge-pill" onClick={handleLocateMe} title="Center on your GPS location">
             <span className="bridge-dot user-dot" />
-            <span className="bridge-name">{effectiveUserLocation?.name || 'You'}</span>
+            <span className="bridge-name">My GPS</span>
           </div>
 
-          <div className="bridge-connector" onClick={handleFocusNearestStop} title="Show walking route">
+          <div className="bridge-connector" onClick={handleFocusNearestStop} title="Show walking route to nearest stop">
             <span className="bridge-arrow">┄┄►</span>
             <span className="bridge-walk-tag">
-              ~{currentNearestStop.walkTimeMinutes || 2} min walk ({currentNearestStop.distanceText || `${currentNearestStop.distanceMeters}m`})
+              ~{nearestStop.walkTimeMinutes || 1} min walk ({nearestStop.distanceText || `${nearestStop.distanceMeters}m`})
             </span>
           </div>
 
-          <div className="bridge-pill stop-pill" onClick={handleFocusNearestStop} title="Center on nearest stop">
+          <div className="bridge-pill stop-pill" onClick={handleFocusNearestStop} title="Center on nearest bus stop">
             <span className="bridge-dot stop-dot" />
-            <span className="bridge-name">{currentNearestStop.name}</span>
+            <span className="bridge-name">{nearestStop.name}</span>
           </div>
         </div>
       )}
 
       {/* 4. Floating Right-Side Controls Dock */}
       <div className="map-controls-dock">
-        {/* Locate Me (User) Button */}
+        {/* Locate Me (User GPS) Button */}
         <button
           type="button"
           className={`map-dock-btn ${isLocatingState ? 'locating' : ''} ${isTrackingState ? 'active' : ''}`}
           onClick={handleLocateMe}
-          title="Center on my location"
-          aria-label="Center on my location"
+          title="Center on my GPS location"
+          aria-label="Center on my GPS location"
         >
           {isLocatingState ? (
             <Loader2 size={19} className="spin" style={{ color: '#2563eb' }} />
@@ -560,13 +496,13 @@ export default function MapView({
           <span className="dock-btn-label">Bus</span>
         </button>
 
-        {/* Focus Nearest Stop Button */}
-        {currentNearestStop && (
+        {/* Focus Nearest Stop Button (Enabled once GPS calculates nearest stop) */}
+        {nearestStop && (
           <button
             type="button"
             className="map-dock-btn stop-btn"
             onClick={handleFocusNearestStop}
-            title={`Center on nearest stop: ${currentNearestStop.name}`}
+            title={`Center on nearest stop: ${nearestStop.name}`}
             aria-label="Center on nearest stop"
           >
             <MapPin size={19} style={{ color: '#059669' }} />
@@ -604,53 +540,78 @@ export default function MapView({
 
           {!hudMinimized && (
             <div className="map-hud-body">
-              {/* Next Stop & ETA readout */}
-              {selectedEta?.nextStop ? (
-                <div className={`hud-next-stop-row ${selectedEta.isArriving ? 'arriving' : ''}`}>
-                  <div className="hud-stop-name-wrap">
-                    <span className="hud-meta-label">NEXT STOP</span>
-                    <strong className="hud-stop-name">{selectedEta.nextStop.name}</strong>
+              <div className="hud-metric-row">
+                {/* Next Stop & ETA */}
+                <div className="hud-metric-card primary">
+                  <div className="metric-label">
+                    <Clock size={12} /> Next Stop
                   </div>
-                  <div className="hud-eta-badge">
-                    <Clock size={12} />
-                    <span>{selectedEta.isArriving ? 'Arriving Now' : selectedEta.etaText}</span>
+                  <div className="metric-value">
+                    {selectedEta?.nextStop?.name || 'In Transit'}
+                  </div>
+                  <div className="metric-sub">
+                    {selectedEta?.isArriving ? (
+                      <span className="arriving-badge">Arriving Now</span>
+                    ) : (
+                      <span>ETA: {selectedEta?.etaText || '--'}</span>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="hud-next-stop-row">
-                  <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
-                    {targetBus.status === 'OFFLINE' ? 'Shuttle is currently offline' : 'Active on Campus Loop'}
-                  </span>
-                </div>
-              )}
 
-              {/* Distance from Student & Speed */}
-              <div className="hud-stats-row">
-                {distanceToSelectedBus !== null && (
-                  <div className="hud-stat-item">
-                    <Footprints size={13} style={{ color: '#2563eb' }} />
-                    <span>
-                      {distanceToSelectedBus < 1000
-                        ? `${distanceToSelectedBus}m from you`
-                        : `${(distanceToSelectedBus / 1000).toFixed(1)}km from you`}
-                    </span>
+                {/* Speed & Distance to User */}
+                <div className="hud-metric-card secondary">
+                  <div className="metric-label">
+                    <Gauge size={12} /> Speed / Dist
                   </div>
-                )}
-
-                <div className="hud-stat-item">
-                  <Gauge size={13} style={{ color: '#475569' }} />
-                  <span>{targetBus.location?.speed_kmh || 0} km/h</span>
+                  <div className="metric-value">
+                    {targetBus.location?.speed_kmh || 0} km/h
+                  </div>
+                  <div className="metric-sub">
+                    {distanceToSelectedBus !== null ? (
+                      <span>
+                        {distanceToSelectedBus < 1000
+                          ? `${distanceToSelectedBus}m from you`
+                          : `${(distanceToSelectedBus / 1000).toFixed(1)}km from you`}
+                      </span>
+                    ) : (
+                      <span>Tracking live</span>
+                    )}
+                  </div>
                 </div>
+              </div>
 
-                <div className="hud-stat-item" style={{ marginLeft: 'auto' }}>
+              {/* HUD Action Footer */}
+              <div className="hud-actions-row">
+                <button
+                  type="button"
+                  className={`btn-hud-action ${isFollowingBus ? 'active' : ''}`}
+                  onClick={handleFocusBus}
+                >
+                  <Bus size={13} />
+                  <span>{isFollowingBus ? 'Following' : 'Center Bus'}</span>
+                </button>
+
+                {nearestStop && (
                   <button
                     type="button"
-                    className={`btn-hud-follow ${isFollowingBus ? 'active' : ''}`}
-                    onClick={isFollowingBus ? () => setIsFollowingBus(false) : handleFocusBus}
+                    className="btn-hud-action"
+                    onClick={handleFocusNearestStop}
                   >
-                    {isFollowingBus ? '✓ Following' : 'Track Bus'}
+                    <MapPin size={13} />
+                    <span>Nearest Stop</span>
                   </button>
-                </div>
+                )}
+
+                {effectiveUserLocation && (
+                  <button
+                    type="button"
+                    className="btn-hud-action"
+                    onClick={handleLocateMe}
+                  >
+                    <LocateFixed size={13} />
+                    <span>My GPS</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -663,31 +624,32 @@ export default function MapView({
         zoom={15}
         scrollWheelZoom={true}
         className="map-inner"
+        zoomControl={false}
       >
-        <MapCameraController
-          focusTarget={activeFocusTarget}
-          selectedBusId={selectedBus?.id}
-          selectedBusLocation={targetBus?.location}
-          isFollowingBus={isFollowingBus}
-          onUserMapInteraction={handleUserMapInteraction}
-          onMapReady={(m) => {
-            mapInstanceRef.current = m;
-          }}
-        />
-
-        <MapClickHandler onSelectLocation={handleMapLocationSelect} />
-
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
         />
 
-        {/* Route Polyline */}
+        {/* Camera Controller handles smooth flying without bouncing/snapping back */}
+        <MapCameraController
+          focusTarget={activeFocusTarget}
+          selectedBusId={targetBus?.id}
+          selectedBusLocation={targetBus?.location}
+          isFollowingBus={isFollowingBus}
+          onUserMapInteraction={handleUserMapInteraction}
+          onMapReady={(map) => {
+            mapInstanceRef.current = map;
+          }}
+        />
+
+        {/* Route Polyline (Route Path connecting ordered stops) */}
         {stopCoordinates.length > 1 && (
           <Polyline
             positions={stopCoordinates}
             pathOptions={{
-              color: '#2563eb',
+              color: selectedBus?.route?.color || '#2563eb',
               weight: 4.5,
               opacity: 0.75,
               dashArray: '6, 8'
@@ -695,12 +657,12 @@ export default function MapView({
           />
         )}
 
-        {/* Green Dotted Walking Path from User to Nearest Stop */}
-        {isWalkingPathDisplayable && currentNearestStop && effectiveUserLocation && (
+        {/* Green Dotted Walking Path from User GPS to Nearest Stop */}
+        {isWalkingPathDisplayable && nearestStop && effectiveUserLocation && (
           <Polyline
             positions={[
               [effectiveUserLocation.lat, effectiveUserLocation.lng],
-              [currentNearestStop.lat, currentNearestStop.lng]
+              [nearestStop.lat, nearestStop.lng]
             ]}
             pathOptions={{
               color: '#10b981',
@@ -713,8 +675,8 @@ export default function MapView({
 
         {/* Bus Stop Markers */}
         {stops.map((stop) => {
-          const isNearest = currentNearestStop?.id === stop.id ||
-            (currentNearestStop?.seq === stop.seq && currentNearestStop?.name === stop.name);
+          const isNearest = nearestStop?.id === stop.id ||
+            (nearestStop?.seq === stop.seq && nearestStop?.name === stop.name);
 
           const isNextForSelected =
             selectedEta?.nextStop?.id === stop.id ||
@@ -749,9 +711,9 @@ export default function MapView({
                         border: '1px solid #a7f3d0'
                       }}
                     >
-                      ★ Nearest Stop ({currentNearestStop.distanceText || `${currentNearestStop.distanceMeters}m`})
+                      ★ Nearest Stop to Your GPS ({nearestStop.distanceText || `${nearestStop.distanceMeters}m`})
                       <div style={{ fontSize: '10px', fontWeight: 600, color: '#047857', marginTop: '2px' }}>
-                        ~{currentNearestStop.walkTimeMinutes || 2} min walk
+                        ~{nearestStop.walkTimeMinutes || 1} min walk
                       </div>
                     </div>
                   )}
@@ -887,12 +849,12 @@ export default function MapView({
           );
         })}
 
-        {/* User Current Location Marker (Draggable, High Visibility, NEVER MISSING!) */}
+        {/* User Authentic GPS Location Marker (Rendered ONLY when GPS is acquired) */}
         {effectiveUserLocation && (
           <>
             <Circle
               center={[effectiveUserLocation.lat, effectiveUserLocation.lng]}
-              radius={Math.min(effectiveUserLocation.accuracy || 20, 150)}
+              radius={Math.min(effectiveUserLocation.accuracy || 15, 100)}
               pathOptions={{
                 color: '#2563eb',
                 fillColor: '#3b82f6',
@@ -903,29 +865,26 @@ export default function MapView({
             />
             <Marker
               position={[effectiveUserLocation.lat, effectiveUserLocation.lng]}
-              icon={createUserIcon(effectiveUserLocation.name)}
+              icon={createGpsUserIcon(effectiveUserLocation.name)}
               zIndexOffset={1000}
-              draggable={true}
-              eventHandlers={{
-                dragend: (e) => {
-                  const latlng = e.target.getLatLng();
-                  handleMarkerDragEnd(latlng.lat, latlng.lng);
-                }
-              }}
+              draggable={false}
             >
               <Popup>
                 <div style={{ padding: '6px', minWidth: 170 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '16px' }}>📍</span>
+                    <span style={{ fontSize: '16px' }}>🛰️</span>
                     <strong style={{ fontSize: '13px', color: '#1e293b' }}>
-                      {effectiveUserLocation.name || 'You are here'}
+                      My Device GPS Location
                     </strong>
                   </div>
+                  <div style={{ fontSize: '11px', color: '#047857', marginBottom: '4px', fontWeight: 600 }}>
+                    Coordinates: {effectiveUserLocation.lat.toFixed(5)}°, {effectiveUserLocation.lng.toFixed(5)}°
+                  </div>
                   <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '6px' }}>
-                    💡 Tip: You can drag this pin anywhere on campus!
+                    Accuracy: ±{effectiveUserLocation.accuracy || 10} meters
                   </div>
 
-                  {currentNearestStop && (
+                  {nearestStop && (
                     <div
                       style={{
                         marginTop: '4px',
@@ -938,9 +897,9 @@ export default function MapView({
                         border: '1px solid #a7f3d0'
                       }}
                     >
-                      ★ Nearest Stop: <strong>{currentNearestStop.name}</strong>
+                      ★ Nearest Stop: <strong>{nearestStop.name}</strong>
                       <div style={{ fontSize: '10px', color: '#047857', marginTop: '2px' }}>
-                        {currentNearestStop.distanceText || `${currentNearestStop.distanceMeters}m`} • ~{currentNearestStop.walkTimeMinutes || 2} min walk
+                        {nearestStop.distanceText || `${nearestStop.distanceMeters}m`} • ~{nearestStop.walkTimeMinutes || 1} min walk
                       </div>
                     </div>
                   )}

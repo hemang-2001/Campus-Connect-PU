@@ -1,41 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// Authentic Pondicherry University Central Campus Location (Default starting fallback)
-export const DEFAULT_CAMPUS_LOCATION = {
-  lat: 12.020898,
-  lng: 79.855204, // Central Library / MBA Department, Pondicherry University
-  accuracy: 10,
-  heading: 0,
-  speed: 0,
-  source: 'campus_default',
-  name: 'Central Library / MBA (Campus)',
-  timestamp: Date.now()
-};
-
-// Restore cached location or fallback to default campus location
-function getInitialLocation() {
-  try {
-    const cached = sessionStorage.getItem('campus_connect_user_gps');
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (parsed?.lat && parsed?.lng) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    // ignore
-  }
-  return DEFAULT_CAMPUS_LOCATION;
-}
-
 /**
- * Custom hook to obtain and watch the student's authentic device GPS telemetry.
- * Uses high-accuracy satellite GPS without caching stale positions (maximumAge: 0).
- * Never discards the user's authentic coordinates.
+ * Custom hook to obtain and stream the user's authentic device GPS telemetry.
+ * Strictly uses navigator.geolocation (zero mock fallback, zero manual override).
+ * Returns userLocation as null until authentic GPS coordinates are acquired.
  */
 export function useUserLocation() {
-  const [userLocation, setUserLocation] = useState(getInitialLocation);
-  const [gpsStatus, setGpsStatus] = useState('locating'); // 'locating' | 'active' | 'denied' | 'error' | 'manual'
+  const [userLocation, setUserLocation] = useState(null);
+  const [gpsStatus, setGpsStatus] = useState('locating'); // 'locating' | 'active' | 'denied' | 'error'
   const [gpsError, setGpsError] = useState(null);
   const [accuracyMeters, setAccuracyMeters] = useState(null);
 
@@ -44,15 +16,15 @@ export function useUserLocation() {
 
   // Clear any active geolocation watch
   const clearCurrentWatch = useCallback(() => {
-    if (watchIdRef.current !== null) {
+    if (watchIdRef.current !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
   }, []);
 
-  // Primary GPS acquisition with true high-accuracy satellite fix
+  // Primary GPS acquisition and streaming
   const requestLocation = useCallback(() => {
-    if (!navigator.geolocation) {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
       setGpsStatus('error');
       setGpsError('Geolocation is not supported by your browser.');
       return;
@@ -62,9 +34,9 @@ export function useUserLocation() {
     setGpsError(null);
     clearCurrentWatch();
 
-    const handleSuccess = (position) => {
+    const handlePositionUpdate = (position) => {
       if (!mountedRef.current) return;
-      const { latitude, longitude, accuracy, heading, speed } = position.coords;
+      const { latitude, longitude, accuracy, heading, speed, altitude } = position.coords;
       const acc = accuracy ? Math.round(accuracy) : 10;
 
       const loc = {
@@ -73,112 +45,77 @@ export function useUserLocation() {
         accuracy: acc,
         heading: heading || 0,
         speed: speed || 0,
+        altitude: altitude || null,
         source: 'gps',
         name: `My GPS Location (±${acc}m)`,
         timestamp: position.timestamp || Date.now()
       };
 
-      // Always set user location to their authentic device coordinates!
-      setUserLocation(loc);
+      setUserLocation((prev) => {
+        // If we already have a fix, update if newer or better accuracy
+        return loc;
+      });
       setAccuracyMeters(acc);
       setGpsStatus('active');
       setGpsError(null);
-
-      try {
-        sessionStorage.setItem('campus_connect_user_gps', JSON.stringify(loc));
-      } catch (e) {
-        // ignore
-      }
-
-      // Attach continuous live watcher for refined positioning
-      if (watchIdRef.current === null) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (pos) => {
-            if (!mountedRef.current) return;
-            const liveAcc = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : 10;
-            const updatedLoc = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              accuracy: liveAcc,
-              heading: pos.coords.heading || 0,
-              speed: pos.coords.speed || 0,
-              source: 'gps',
-              name: `My GPS Location (±${liveAcc}m)`,
-              timestamp: pos.timestamp || Date.now()
-            };
-
-            setUserLocation(updatedLoc);
-            setAccuracyMeters(liveAcc);
-            setGpsStatus('active');
-          },
-          (watchErr) => {
-            console.warn('GPS continuous watch notice:', watchErr.message);
-          },
-          {
-            enableHighAccuracy: true,
-            maximumAge: 0, // Force fresh real-time satellite fixes, no stale cache
-            timeout: 20000
-          }
-        );
-      }
     };
 
-    const handleError = (error) => {
+    const handlePositionError = (error) => {
       if (!mountedRef.current) return;
-      console.warn('Geolocation error:', error.code, error.message);
+      console.warn('Geolocation notice:', error.code, error.message);
+
       if (error.code === 1) {
+        // PERMISSION_DENIED
         setGpsStatus('denied');
-        setGpsError('Location permission denied. Please allow location access in your browser.');
+        setGpsError('Location access was denied. Please allow location permissions in your browser address bar.');
       } else if (error.code === 2) {
+        // POSITION_UNAVAILABLE
         setGpsStatus('error');
-        setGpsError('GPS signal unavailable. You can drag the blue pin on the map to set your location.');
+        setGpsError('GPS satellite signal unavailable. Please ensure GPS/Location is enabled on your device.');
       } else if (error.code === 3) {
-        // High accuracy satellite GPS timed out -> try standard accuracy as fallback
+        // TIMEOUT on strict satellite fix -> try immediate fallback without highAccuracy
         navigator.geolocation.getCurrentPosition(
-          handleSuccess,
-          (finalErr) => {
+          handlePositionUpdate,
+          (fallbackErr) => {
             if (!mountedRef.current) return;
             setGpsStatus('error');
-            setGpsError('Location timed out. Drag the blue pin on the map or tap any campus spot.');
+            setGpsError('GPS signal timed out. Please tap "Refresh GPS" to try again.');
           },
-          { enableHighAccuracy: false, timeout: 12000, maximumAge: 0 }
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
         );
       } else {
         setGpsStatus('error');
-        setGpsError(error.message || 'Unable to acquire GPS signal.');
+        setGpsError(error.message || 'Unable to acquire device GPS signal.');
       }
     };
 
-    // Request fresh high-accuracy satellite GPS fix (maximumAge: 0 ensures non-stale fix)
+    // 1. Immediately request current high-accuracy position
     navigator.geolocation.getCurrentPosition(
-      handleSuccess,
-      handleError,
+      handlePositionUpdate,
+      handlePositionError,
       {
         enableHighAccuracy: true,
         timeout: 15000,
-        maximumAge: 0 // Do not use stale cached coordinates
+        maximumAge: 0 // Strictly fresh satellite fix
       }
     );
-  }, [clearCurrentWatch]);
 
-  // Set manual location (tapping map, dragging pin, or picking a campus spot)
-  const setManualLocation = useCallback((point) => {
-    clearCurrentWatch();
-    const newPoint = {
-      ...point,
-      source: 'manual',
-      name: point.name || 'Custom Pinned Spot',
-      timestamp: Date.now()
-    };
-    setUserLocation(newPoint);
-    setAccuracyMeters(point.accuracy || 10);
-    setGpsStatus('manual');
-    setGpsError(null);
-
+    // 2. Concurrently start continuous watch for live movement & accuracy refinement
     try {
-      sessionStorage.setItem('campus_connect_user_gps', JSON.stringify(newPoint));
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        handlePositionUpdate,
+        (watchErr) => {
+          // Do not overwrite active state if watch has a minor hiccup
+          console.warn('GPS continuous watch notice:', watchErr.message);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0
+        }
+      );
     } catch (e) {
-      // ignore
+      console.warn('Error starting watchPosition:', e);
     }
   }, [clearCurrentWatch]);
 
@@ -186,6 +123,22 @@ export function useUserLocation() {
   useEffect(() => {
     mountedRef.current = true;
     requestLocation();
+
+    // Check browser permission changes if supported
+    if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'denied') {
+          setGpsStatus('denied');
+        }
+        result.onchange = () => {
+          if (result.state === 'granted') {
+            requestLocation();
+          } else if (result.state === 'denied') {
+            setGpsStatus('denied');
+          }
+        };
+      }).catch(() => {});
+    }
 
     return () => {
       mountedRef.current = false;
@@ -198,8 +151,6 @@ export function useUserLocation() {
     gpsStatus,
     gpsError,
     accuracyMeters,
-    requestLocation,
-    setManualLocation,
-    setUserLocation
+    requestLocation
   };
 }

@@ -551,13 +551,9 @@ body {
   flex-direction: column;
   align-items: center;
   position: relative;
-  cursor: grab;
+  cursor: pointer;
   user-select: none;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.28));
-}
-
-.user-marker-pin-wrap:active {
-  cursor: grabbing;
 }
 
 .user-marker-callout {

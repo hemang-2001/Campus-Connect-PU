@@ -4,7 +4,7 @@ import BusCard from '../../components/BusCard';
 import Loader from '../../components/Loader';
 import ErrorState from '../../components/ErrorState';
 import { useBusLocations, FALLBACK_STOPS } from '../../hooks/useBusLocations';
-import { useUserLocation, DEFAULT_CAMPUS_LOCATION } from '../../hooks/useUserLocation';
+import { useUserLocation } from '../../hooks/useUserLocation';
 import { supabase } from '../../lib/supabaseClient';
 import { getBusETA, findNearestStop, getClosestBusToStop, getDistanceMeters } from '../../lib/eta';
 import {
@@ -17,25 +17,9 @@ import {
   AlertTriangle,
   Loader2,
   Footprints,
-  Compass,
-  CheckCircle2,
   Search,
-  Sparkles,
-  ChevronRight,
-  Radio,
-  Check,
-  Target
+  Radio
 } from 'lucide-react';
-
-// Authentic Pondicherry University Campus Landmarks for quick indoor/weak GPS testing
-const CAMPUS_LANDMARKS = [
-  { id: 'lib', name: 'Central Library / MBA', shortName: 'Central Library', lat: 12.020898, lng: 79.855204, icon: '📚' },
-  { id: 'gate1', name: 'Main Gate 1', shortName: 'Main Gate 1', lat: 12.019596, lng: 79.859077, icon: '🏫' },
-  { id: 'ganga', name: 'Ganga Girls Hostel', shortName: 'Ganga Hostel', lat: 12.021689, lng: 79.849130, icon: '🏠' },
-  { id: 'mess', name: 'Mother Teresa Mess', shortName: 'MT Mess', lat: 12.022298, lng: 79.847990, icon: '🍛' },
-  { id: 'health', name: 'Health Care Center', shortName: 'Health Center', lat: 12.019434, lng: 79.850250, icon: '🏥' },
-  { id: 'sj', name: 'Silver Jubilee Campus', shortName: 'SJ Campus', lat: 12.033146, lng: 79.857535, icon: '🎓' }
-];
 
 export default function StudentHome() {
   const {
@@ -50,14 +34,13 @@ export default function StudentHome() {
     getStopsForBus
   } = useBusLocations();
 
-  // Authentic device GPS telemetry hook (fresh high accuracy fix, zero coordinate truncation!)
+  // Authentic device GPS telemetry hook (strictly device GPS only!)
   const {
     userLocation,
     gpsStatus,
     gpsError,
     accuracyMeters,
-    requestLocation,
-    setManualLocation
+    requestLocation
   } = useUserLocation();
 
   const [stops, setStops] = useState([]);
@@ -65,7 +48,6 @@ export default function StudentHome() {
   const [focusTarget, setFocusTarget] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const hasAutoCenteredRef = useRef(false);
-  const hasCenteredOnRealGpsRef = useRef(false);
 
   // When selected bus changes, load its route's stops
   useEffect(() => {
@@ -100,11 +82,13 @@ export default function StudentHome() {
     loadStops();
   }, [selectedBus?.route?.id, selectedBus?.route?.name]);
 
-  // Find nearest stop from user's coordinates among all campus stops (always calculated!)
+  // Find nearest stop STRICTLY and exclusively from the user's authentic device GPS location!
   const nearestStop = useMemo(() => {
+    if (!userLocation?.lat || !userLocation?.lng || userLocation?.source !== 'gps') {
+      return null;
+    }
     const pool = allStops && allStops.length > 0 ? allStops : (stops && stops.length > 0 ? stops : FALLBACK_STOPS.default);
-    const loc = userLocation || DEFAULT_CAMPUS_LOCATION;
-    return findNearestStop(loc, pool);
+    return findNearestStop(userLocation, pool);
   }, [userLocation, allStops, stops]);
 
   // Find closest approaching bus to the nearest stop
@@ -112,23 +96,10 @@ export default function StudentHome() {
     return getClosestBusToStop(nearestStop, buses);
   }, [nearestStop, buses]);
 
-  // Auto-center map ONCE upon initial component mount
+  // Automatically center map on user's real GPS fix once when authentic satellites lock in
   useEffect(() => {
     if (userLocation?.lat && userLocation?.lng && !hasAutoCenteredRef.current) {
       hasAutoCenteredRef.current = true;
-      setFocusTarget({
-        lat: userLocation.lat,
-        lng: userLocation.lng,
-        zoom: 16,
-        timestamp: Date.now()
-      });
-    }
-  }, [userLocation]);
-
-  // Automatically center map on user's real GPS fix the moment authentic satellites lock in!
-  useEffect(() => {
-    if (userLocation?.source === 'gps' && !hasCenteredOnRealGpsRef.current) {
-      hasCenteredOnRealGpsRef.current = true;
       setFocusTarget({
         lat: userLocation.lat,
         lng: userLocation.lng,
@@ -138,7 +109,7 @@ export default function StudentHome() {
     }
   }, [userLocation]);
 
-  // Action: Center map on student's location (and poll fresh GPS fix)
+  // Action: Center map on student's GPS location (and refresh satellite fix)
   const handleCenterOnUser = () => {
     requestLocation();
     if (userLocation?.lat && userLocation?.lng) {
@@ -186,24 +157,6 @@ export default function StudentHome() {
         timestamp: Date.now()
       });
     }
-  };
-
-  // Action: Set spot to a preset campus landmark (very useful indoors or with weak GPS)
-  const handleSelectLandmark = (landmark) => {
-    setManualLocation({
-      lat: landmark.lat,
-      lng: landmark.lng,
-      accuracy: 10,
-      source: 'manual',
-      name: landmark.name
-    });
-
-    setFocusTarget({
-      lat: landmark.lat,
-      lng: landmark.lng,
-      zoom: 16,
-      timestamp: Date.now()
-    });
   };
 
   if (loading) {
@@ -297,7 +250,7 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* 2. Interactive Map (Fixed Centering, Always Shows User Location & Walking Route) */}
+      {/* 2. Interactive Map (Strictly Using User GPS Location) */}
       <MapView
         buses={buses}
         stops={stops}
@@ -305,7 +258,6 @@ export default function StudentHome() {
         selectedBus={selectedBus}
         onSelectBus={handleSelectBus}
         userLocation={userLocation}
-        onUserLocationChange={setManualLocation}
         nearestStop={nearestStop}
         focusTarget={focusTarget}
         gpsStatus={gpsStatus}
@@ -314,20 +266,21 @@ export default function StudentHome() {
 
       {/* 3. Main Controls & Information Container */}
       <div style={{ padding: '16px' }}>
-        {/* Real-time GPS Accuracy & Status Strip */}
+        {/* Real-time Device GPS Status Banner */}
         <div className={`user-gps-strip ${gpsStatus}`}>
           <div className="user-gps-badge">
-            {gpsStatus === 'active' && (
+            {gpsStatus === 'active' && userLocation && (
               <>
                 <span className="pulse-dot live" />
                 <div>
-                  <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#065f46' }}>
-                    📍 Live GPS Active • Accurate to ±{userLocation?.accuracy || 10}m
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span>🛰️ Live GPS Active</span>
+                    <span style={{ fontSize: '0.7rem', padding: '1px 6px', background: '#d1fae5', color: '#047857', borderRadius: '4px' }}>
+                      ±{userLocation.accuracy || 10}m accuracy
+                    </span>
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: '#047857' }}>
-                    {userLocation?.accuracy <= 15
-                      ? 'High-precision satellite lock'
-                      : 'Wi-Fi / Network positioning • Drag pin on map for exact spot'}
+                  <div style={{ fontSize: '0.72rem', color: '#047857', marginTop: '2px' }}>
+                    GPS: {userLocation.lat.toFixed(5)}°, {userLocation.lng.toFixed(5)}° • Nearest stop computed strictly from your device GPS
                   </div>
                 </div>
               </>
@@ -337,10 +290,10 @@ export default function StudentHome() {
                 <Loader2 size={16} className="spin" style={{ color: '#2563eb' }} />
                 <div>
                   <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e40af' }}>
-                    Acquiring Satellite GPS...
+                    Acquiring Device GPS Satellite Fix...
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#3b82f6' }}>
-                    Requesting fresh high-accuracy coordinates
+                    Please click "Allow" in your browser location prompt
                   </div>
                 </div>
               </>
@@ -350,10 +303,10 @@ export default function StudentHome() {
                 <AlertTriangle size={16} style={{ color: '#d97706' }} />
                 <div>
                   <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#92400e' }}>
-                    GPS Access Blocked
+                    GPS Access Denied in Browser
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#b45309' }}>
-                    Allow location in browser address bar or drag the blue pin
+                    Please enable location access in your browser address bar to find your nearest stop
                   </div>
                 </div>
               </>
@@ -366,20 +319,7 @@ export default function StudentHome() {
                     GPS Signal Notice
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#b91c1c' }}>
-                    {gpsError || 'Drag the blue pin on the map to pinpoint your exact spot'}
-                  </div>
-                </div>
-              </>
-            )}
-            {gpsStatus === 'manual' && (
-              <>
-                <MapPin size={16} style={{ color: '#2563eb' }} />
-                <div>
-                  <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>
-                    Custom Pin: {userLocation?.name || 'Pinned Spot'}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                    Showing walking route and nearest stop from this point
+                    {gpsError || 'Tap "Refresh GPS" to acquire a satellite fix'}
                   </div>
                 </div>
               </>
@@ -391,117 +331,75 @@ export default function StudentHome() {
               type="button"
               className="btn-gps-primary"
               onClick={handleCenterOnUser}
-              title="Center on my location"
+              title="Center on my GPS coordinates"
             >
-              <LocateFixed size={14} /> Center Me
+              <LocateFixed size={14} /> Center on GPS
             </button>
 
             <button
               type="button"
               className="btn-gps-outline"
               onClick={requestLocation}
-              title="Force refresh high accuracy GPS"
+              title="Force poll fresh satellite GPS fix"
             >
-              <RefreshCw size={13} /> Refresh
+              <RefreshCw size={13} /> Refresh GPS
             </button>
           </div>
         </div>
 
-        {/* Prominent Campus Spot Quick-Picker (ALWAYS VISIBLE & EASY TO USE) */}
-        <div className="campus-landmarks-strip">
-          <div className="landmarks-title flex-between">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <MapPin size={14} style={{ color: 'var(--blue)' }} />
-              <strong>Set Your Campus Spot</strong>
-            </span>
-            <span className="text-xs text-muted">Tap to switch spot • Or drag blue pin on map</span>
-          </div>
-
-          <div className="landmarks-pills-row">
-            {/* Real Device GPS button */}
-            <button
-              type="button"
-              className={`landmark-chip-btn ${userLocation?.source === 'gps' ? 'active' : ''}`}
-              onClick={handleCenterOnUser}
-              title="Use authentic live device GPS"
-            >
-              <span>🛰️</span>
-              <span>My Live GPS</span>
-              {userLocation?.source === 'gps' && <Check size={12} style={{ color: 'var(--blue)' }} />}
-            </button>
-
-            {CAMPUS_LANDMARKS.map((lm) => {
-              const isCurrent = userLocation?.name?.toLowerCase().includes(lm.shortName.toLowerCase());
-
-              return (
-                <button
-                  key={lm.id}
-                  type="button"
-                  className={`landmark-chip-btn ${isCurrent ? 'active' : ''}`}
-                  onClick={() => handleSelectLandmark(lm)}
-                >
-                  <span>{lm.icon}</span>
-                  <span>{lm.shortName}</span>
-                  {isCurrent && <Check size={12} style={{ color: 'var(--blue)' }} />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 4. Nearest Bus Stop Card (Always Populated, Crisp, and Intuitive) */}
-        <div className="card mb-3 nearest-stop-card">
-          <div className="flex-between mb-2">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: '50%',
-                  backgroundColor: '#10b981',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 3px 10px rgba(16, 185, 129, 0.4)',
-                  flexShrink: 0
-                }}
-              >
-                <MapPin size={24} />
-              </div>
-              <div>
+        {/* 4. Nearest Bus Stop Card (STRICTLY FROM USER GPS) */}
+        {nearestStop && userLocation ? (
+          <div className="card mb-3 nearest-stop-card">
+            <div className="flex-between mb-2">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div
                   style={{
-                    fontSize: '0.7rem',
-                    fontWeight: 800,
-                    color: '#047857',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 3px 10px rgba(16, 185, 129, 0.4)',
+                    flexShrink: 0
                   }}
                 >
-                  ★ Your Nearest Campus Stop
+                  <MapPin size={24} />
                 </div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '2px 0' }}>
-                  {nearestStop ? nearestStop.name : 'University Main Gate 1'}
-                </h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                  <span
+                <div>
+                  <div
                     style={{
-                      display: 'inline-block',
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      backgroundColor: nearestStop?.route?.color || '#2563eb'
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      color: '#047857',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
                     }}
-                  />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>
-                    {nearestStop?.route?.name || 'Route 1 Library - SJ Campus'}
-                  </span>
+                  >
+                    ★ Nearest Stop to Your GPS Location
+                  </div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '2px 0' }}>
+                    {nearestStop.name}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: nearestStop?.route?.color || '#2563eb'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>
+                      {nearestStop?.route?.name || 'Campus Loop'} • Stop #{nearestStop.seq}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {nearestStop && (
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <span
                   style={{
@@ -518,84 +416,164 @@ export default function StudentHome() {
                 </span>
                 <div style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
                   <Footprints size={13} />
-                  <span>~{nearestStop.walkTimeMinutes || 2} min walk</span>
+                  <span>~{nearestStop.walkTimeMinutes || 1} min walk</span>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Closest Approaching Bus to Nearest Stop */}
-          {closestBusInfo ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                marginTop: '10px',
-                fontSize: '0.8125rem',
-                border: '1px solid rgba(16, 185, 129, 0.25)'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                <Bus size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Approaching: <strong>{closestBusInfo.bus.plate_no}</strong> ({closestBusInfo.bus.route?.name || 'Campus Shuttle'})
-                </span>
-              </div>
-              <span
+            {/* Closest Approaching Bus to Nearest Stop */}
+            {closestBusInfo ? (
+              <div
                 style={{
-                  fontWeight: 800,
-                  color: closestBusInfo.isArriving ? '#059669' : '#2563eb',
-                  backgroundColor: closestBusInfo.isArriving ? '#ecfdf5' : '#eff6ff',
-                  padding: '3px 9px',
-                  borderRadius: '4px',
-                  whiteSpace: 'nowrap',
-                  marginLeft: '8px'
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  marginTop: '10px',
+                  fontSize: '0.8125rem',
+                  border: '1px solid rgba(16, 185, 129, 0.25)'
                 }}
               >
-                {closestBusInfo.etaText}
-              </span>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                backgroundColor: 'rgba(255, 255, 255, 0.85)',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                marginTop: '10px',
-                fontSize: '0.75rem',
-                color: '#64748b'
-              }}
-            >
-              <Clock size={14} />
-              <span>Monitoring shuttles approaching this stop...</span>
-            </div>
-          )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                  <Bus size={16} style={{ color: '#2563eb', flexShrink: 0 }} />
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    Approaching: <strong>{closestBusInfo.bus.plate_no}</strong> ({closestBusInfo.bus.route?.name || 'Campus Shuttle'})
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontWeight: 800,
+                    color: closestBusInfo.isArriving ? '#059669' : '#2563eb',
+                    backgroundColor: closestBusInfo.isArriving ? '#ecfdf5' : '#eff6ff',
+                    padding: '3px 9px',
+                    borderRadius: '4px',
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px'
+                  }}
+                >
+                  {closestBusInfo.etaText}
+                </span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  marginTop: '10px',
+                  fontSize: '0.75rem',
+                  color: '#64748b'
+                }}
+              >
+                <Clock size={14} />
+                <span>Monitoring shuttles approaching this stop...</span>
+              </div>
+            )}
 
-          {/* Action Buttons */}
-          <div className="nearest-stop-actions">
-            <button
-              type="button"
-              className="btn-stop-primary"
-              onClick={handleFocusNearestStop}
-            >
-              <MapPin size={15} /> Show Walking Route on Map
-            </button>
-            <button
-              type="button"
-              className="btn-gps-outline"
-              onClick={handleCenterOnUser}
-            >
-              <LocateFixed size={15} /> Center on My Location
-            </button>
+            {/* Action Buttons */}
+            <div className="nearest-stop-actions">
+              <button
+                type="button"
+                className="btn-stop-primary"
+                onClick={handleFocusNearestStop}
+              >
+                <MapPin size={15} /> Show Walking Route on Map
+              </button>
+              <button
+                type="button"
+                className="btn-gps-outline"
+                onClick={handleCenterOnUser}
+              >
+                <LocateFixed size={15} /> Center on My GPS
+              </button>
+            </div>
           </div>
-        </div>
+        ) : gpsStatus === 'locating' ? (
+          <div className="card mb-3 nearest-stop-card" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 0' }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '50%',
+                  backgroundColor: '#dbeafe',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <Loader2 size={24} className="spin" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e40af', margin: '0 0 2px 0' }}>
+                  Acquiring your device GPS position...
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: '#3b82f6', margin: 0 }}>
+                  Please click "Allow" in your browser location prompt to find your nearest stop.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                onClick={requestLocation}
+              >
+                <LocateFixed size={14} /> Allow GPS
+              </button>
+            </div>
+          </div>
+        ) : gpsStatus === 'denied' ? (
+          <div className="card mb-3 nearest-stop-card" style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 0' }}>
+              <AlertTriangle size={28} style={{ color: '#d97706', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#92400e', margin: '0 0 2px 0' }}>
+                  Location Permission Blocked
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: '#b45309', margin: 0 }}>
+                  To find your nearest stop from your live position, please allow location in your browser address bar.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                onClick={requestLocation}
+              >
+                <RefreshCw size={13} /> Retry GPS
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="card mb-3 nearest-stop-card" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '6px 0' }}>
+              <Radio size={28} style={{ color: '#64748b', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: '0 0 2px 0' }}>
+                  Ready to Detect Nearest Stop
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
+                  Nearest stop is calculated strictly and exclusively using your authentic device GPS coordinates.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                onClick={requestLocation}
+              >
+                <LocateFixed size={14} /> Detect My GPS
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 5. Interactive Route Progress Stepper (Timeline) */}
         {selectedBus?.route && stops.length > 0 && (
@@ -650,7 +628,7 @@ export default function StudentHome() {
                       )}
                       {isNearest && !isNext && (
                         <span className="stepper-nearest-tag">
-                          Nearest to you
+                          Nearest to your GPS
                         </span>
                       )}
                     </div>
