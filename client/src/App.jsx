@@ -5,6 +5,7 @@ import { AlertNotificationProvider } from './context/AlertNotificationContext';
 
 import Layout from './components/Layout';
 import Loader from './components/Loader';
+import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Alerts from './pages/Alerts';
@@ -34,8 +35,10 @@ function Protected({ allowedRoles, children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(role)) {
-    const fallbackHome = role === 'driver' ? '/driver' : role === 'admin' ? '/admin' : '/';
+  const normalizedRole = (role || 'student').toLowerCase();
+
+  if (allowedRoles && !allowedRoles.map((r) => r.toLowerCase()).includes(normalizedRole)) {
+    const fallbackHome = normalizedRole === 'driver' ? '/driver' : normalizedRole === 'admin' ? '/admin' : '/';
     return <Navigate to={fallbackHome} replace />;
   }
 
@@ -53,8 +56,9 @@ function RoleHome() {
     return <Loader message="Routing to your dashboard..." />;
   }
 
-  if (role === 'driver') return <Navigate to="/driver" replace />;
-  if (role === 'admin') return <Navigate to="/admin" replace />;
+  const normalizedRole = (role || 'student').toLowerCase();
+  if (normalizedRole === 'driver') return <Navigate to="/driver" replace />;
+  if (normalizedRole === 'admin') return <Navigate to="/admin" replace />;
   return <StudentHome />;
 }
 
@@ -62,75 +66,101 @@ export default function App() {
   return (
     <BrowserRouter>
       <AlertNotificationProvider>
-        <Routes>
+        <ErrorBoundary>
+          <Routes>
 
-        {/* Public Authentication Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+          {/* Public Authentication Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Authenticated Application Shell */}
-        <Route
-          element={
-            <Protected>
-              <Layout />
-            </Protected>
-          }
-        >
-          {/* Smart Root Route */}
-          <Route path="/" element={<RoleHome />} />
+          {/* Authenticated Application Shell */}
           <Route
-            path="/complaints"
             element={
-              <Protected allowedRoles={['student']}>
-                <Complaints />
+              <Protected>
+                <Layout />
               </Protected>
             }
-          />
-          <Route
-            path="/complaints/new"
-            element={
-              <Protected allowedRoles={['student']}>
-                <NewComplaint />
-              </Protected>
-            }
-          />
+          >
+            {/* Smart Root Route */}
+            <Route path="/" element={<RoleHome />} />
+            <Route
+              path="/complaints"
+              element={
+                <Protected allowedRoles={['student']}>
+                  <ErrorBoundary>
+                    <Complaints />
+                  </ErrorBoundary>
+                </Protected>
+              }
+            />
+            <Route
+              path="/complaints/new"
+              element={
+                <Protected allowedRoles={['student']}>
+                  <ErrorBoundary>
+                    <NewComplaint />
+                  </ErrorBoundary>
+                </Protected>
+              }
+            />
 
-          {/* Shared Authenticated Routes */}
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/profile" element={<Profile />} />
+            {/* Shared Authenticated Routes */}
+            <Route
+              path="/alerts"
+              element={
+                <ErrorBoundary>
+                  <Alerts />
+                </ErrorBoundary>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ErrorBoundary>
+                  <Profile />
+                </ErrorBoundary>
+              }
+            />
 
-          {/* Driver Route */}
-          <Route
-            path="/driver"
-            element={
-              <Protected allowedRoles={['driver', 'admin']}>
-                <DriverDashboard />
-              </Protected>
-            }
-          />
+            {/* Driver Route */}
+            <Route
+              path="/driver"
+              element={
+                <Protected allowedRoles={['driver', 'admin']}>
+                  <ErrorBoundary>
+                    <DriverDashboard />
+                  </ErrorBoundary>
+                </Protected>
+              }
+            />
 
-          {/* Admin Routes */}
-          <Route
-            path="/admin"
-            element={
-              <Protected allowedRoles={['admin']}>
-                <AdminDashboard />
-              </Protected>
-            }
-          />
-          <Route
-            path="/admin/complaints"
-            element={
-              <Protected allowedRoles={['admin']}>
-                <ComplaintsAdmin />
-              </Protected>
-            }
-          />
-        </Route>
+            {/* Admin Routes */}
+            <Route
+              path="/admin"
+              element={
+                <Protected allowedRoles={['admin']}>
+                  <ErrorBoundary>
+                    <AdminDashboard />
+                  </ErrorBoundary>
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/complaints"
+              element={
+                <Protected allowedRoles={['admin']}>
+                  <ErrorBoundary>
+                    <ComplaintsAdmin />
+                  </ErrorBoundary>
+                </Protected>
+              }
+            />
+          </Route>
 
-        {/* Catch-all Redirect */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Catch-all Redirect */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        </ErrorBoundary>
       </AlertNotificationProvider>
     </BrowserRouter>
   );

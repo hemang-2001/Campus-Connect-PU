@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   RotateCcw,
   MapPin,
-  Clock
+  Clock,
+  Navigation
 } from 'lucide-react';
 
 export default function DriverDashboard() {

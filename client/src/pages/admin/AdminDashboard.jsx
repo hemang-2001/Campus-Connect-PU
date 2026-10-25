@@ -127,9 +127,11 @@ export default function AdminDashboard() {
   }, [session]);
 
   // Live in last 5 minutes calculation
+  const busList = Array.isArray(buses) ? buses : [];
+  const userList = Array.isArray(users) ? users : [];
   const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-  const liveLast5Min = buses.filter((b) => {
-    if (!b.location?.updated_at) return false;
+  const liveLast5Min = busList.filter((b) => {
+    if (!b?.location?.updated_at) return false;
     const updateTime = new Date(b.location.updated_at).getTime();
     return updateTime > fiveMinAgo;
   }).length;
@@ -171,7 +173,7 @@ export default function AdminDashboard() {
             <span className="text-xs text-muted font-semibold">Total Fleet</span>
             <Bus size={18} color="var(--blue)" />
           </div>
-          <span style={{ fontSize: '1.75rem', fontWeight: 800 }}>{buses.length}</span>
+          <span style={{ fontSize: '1.75rem', fontWeight: 800 }}>{busList.length}</span>
           <span className="text-xs text-muted" style={{ display: 'block' }}>Configured buses</span>
         </div>
 
@@ -213,11 +215,11 @@ export default function AdminDashboard() {
       <div className="card">
         <div className="flex-between mb-3">
           <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Fleet Real-Time Status</h3>
-          <span className="text-xs text-muted">{buses.length} vehicles</span>
+          <span className="text-xs text-muted">{busList.length} vehicles</span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {buses.map((bus) => {
+          {busList.map((bus) => {
             const isFresh = bus.location?.updated_at &&
               (Date.now() - new Date(bus.location.updated_at).getTime() < 300000);
 
@@ -268,11 +270,11 @@ export default function AdminDashboard() {
             <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Registered Accounts Management</h3>
             <p className="text-xs text-muted">Delete any account completely from both database and auth with 1 click</p>
           </div>
-          <span className="text-xs text-muted">{users.length} accounts</span>
+          <span className="text-xs text-muted">{userList.length} accounts</span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {users.map((u) => (
+          {userList.map((u) => (
             <div
               key={u.id}
               style={{
@@ -342,7 +344,7 @@ export default function AdminDashboard() {
                   </button>
                 )}
 
-                {u.email?.toLowerCase() !== 'hamang2001@gmail.com' ? (
+                {(u.email || u.mail_id || '')?.toLowerCase() !== 'hamang2001@gmail.com' ? (
                   <button
                     type="button"
                     className="btn btn-outline"

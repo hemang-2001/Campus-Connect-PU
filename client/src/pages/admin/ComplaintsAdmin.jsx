@@ -223,7 +223,7 @@ export default function ComplaintsAdmin() {
                 >
                   {c.category}
                 </span>
-                <Badge variant={c.status}>{c.status.replace('_', ' ')}</Badge>
+                <Badge variant={c.status || 'open'}>{String(c.status || 'open').replace('_', ' ')}</Badge>
               </div>
 
               <h4 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: '6px' }}>
@@ -288,7 +288,7 @@ export default function ComplaintsAdmin() {
                     id={`status-${c.id}`}
                     className="form-select"
                     style={{ padding: '6px 10px', fontSize: '0.8125rem', width: 'auto' }}
-                    value={statusDrafts[c.id] || c.status}
+                    value={statusDrafts[c.id] || c.status || 'open'}
                     onChange={(e) =>
                       setStatusDrafts({ ...statusDrafts, [c.id]: e.target.value })
                     }

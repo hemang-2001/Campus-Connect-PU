@@ -191,7 +191,7 @@ export function AuthProvider({ children }) {
 
       // Check if user is approved (Staff/Driver must wait for admin approval)
       const userEmail = data.user?.email?.toLowerCase();
-      const userRole = userProfile?.role || data.user?.user_metadata?.role || 'student';
+      const userRole = String(userProfile?.role || data.user?.user_metadata?.role || 'student').toLowerCase();
       const isLeadAdmin = userEmail === 'hamang2001@gmail.com';
       const isApproved =
         isLeadAdmin ||
@@ -328,7 +328,7 @@ export function AuthProvider({ children }) {
 
   const role = (user?.email?.toLowerCase() === 'hamang2001@gmail.com')
     ? 'admin'
-    : (profile?.role || user?.user_metadata?.role || 'student');
+    : String(profile?.role || user?.user_metadata?.role || 'student').toLowerCase();
 
   const value = {
     session,
