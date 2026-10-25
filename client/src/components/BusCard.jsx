@@ -130,6 +130,40 @@ export default function BusCard({ bus, stops = [], isSelected, onSelect }) {
         </div>
       ) : null}
 
+      {/* Tracking state banner */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '8px',
+          fontSize: '0.75rem'
+        }}
+      >
+        {isSelected ? (
+          <span
+            style={{
+              color: 'var(--blue)',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            ✓ Currently tracking on map
+          </span>
+        ) : (
+          <span
+            style={{
+              color: 'var(--gray-500)',
+              fontWeight: 500
+            }}
+          >
+            Tap card to track on map →
+          </span>
+        )}
+      </div>
+
       <div
         className="flex-between text-xs text-muted"
         style={{
