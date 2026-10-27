@@ -458,13 +458,6 @@ export default function StudentHome() {
               >
                 <MapPin size={15} /> Show Walking Route on Map
               </button>
-              <button
-                type="button"
-                className="btn-gps-outline"
-                onClick={handleCenterOnUser}
-              >
-                <LocateFixed size={15} /> Center on My GPS
-              </button>
             </div>
           </div>
         ) : gpsStatus === 'locating' ? (
@@ -493,14 +486,10 @@ export default function StudentHome() {
                   Please click "Allow" in your browser location prompt to find your nearest stop.
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                onClick={requestLocation}
-              >
-                <LocateFixed size={14} /> Allow GPS
-              </button>
+              <div className="gps-auto-sync-badge">
+                <span className="auto-sync-pulse" />
+                <span className="auto-sync-text">Acquiring (5s)</span>
+              </div>
             </div>
           </div>
         ) : gpsStatus === 'denied' ? (

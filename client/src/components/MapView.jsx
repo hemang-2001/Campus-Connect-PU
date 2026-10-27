@@ -573,17 +573,6 @@ export default function MapView({
                     <span>Nearest Stop</span>
                   </button>
                 )}
-
-                {effectiveUserLocation && (
-                  <button
-                    type="button"
-                    className="btn-hud-action"
-                    onClick={handleLocateMe}
-                  >
-                    <LocateFixed size={13} />
-                    <span>My GPS</span>
-                  </button>
-                )}
               </div>
             </div>
           )}
