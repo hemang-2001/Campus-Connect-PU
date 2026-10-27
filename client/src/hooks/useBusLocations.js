@@ -205,11 +205,11 @@ export function useBusLocations() {
     return () => clearInterval(watchdogInterval);
   }, []);
 
-  // 4. Background re-sync every 6 seconds as a solid fallback to WebSocket
+  // 4. Background re-sync every 5 seconds for live bus fleet updates
   useEffect(() => {
     const syncInterval = setInterval(() => {
       fetchActiveBuses();
-    }, 6000);
+    }, 5000);
 
     return () => clearInterval(syncInterval);
   }, [fetchActiveBuses]);

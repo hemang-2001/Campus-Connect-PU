@@ -605,6 +605,15 @@ body {
   animation: user-radar 2s ease-out infinite;
 }
 
+.user-marker-radar-outer {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.22);
+  animation: user-radar 2s ease-out infinite 0.7s;
+}
+
 .user-marker-pin-head {
   position: relative;
   width: 24px;
@@ -632,6 +641,122 @@ body {
   100% {
     transform: scale(2.6);
     opacity: 0;
+  }
+}
+
+/* Live Location Pulse Icon & Auto-Sync Indicators */
+.live-location-pulse-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  flex-shrink: 0;
+}
+
+.live-location-pulse-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  border: 2px solid #10b981;
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.live-location-pulse-icon {
+  animation: pulse-icon-beat 2s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes pulse-icon-beat {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgba(16, 185, 129, 0.6));
+  }
+  50% {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.9));
+  }
+}
+
+.live-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: auto-sync-beacon 2s infinite;
+  display: inline-block;
+}
+
+.gps-auto-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #047857;
+  white-space: nowrap;
+}
+
+.fleet-auto-sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--gray-50);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.auto-sync-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: auto-sync-beacon 2s infinite;
+  flex-shrink: 0;
+}
+
+@keyframes auto-sync-beacon {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
   }
 }
 

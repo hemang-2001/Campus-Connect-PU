@@ -79,7 +79,7 @@ export function useUserLocation() {
           (fallbackErr) => {
             if (!mountedRef.current) return;
             setGpsStatus('error');
-            setGpsError('GPS signal timed out. Please tap "Refresh GPS" to try again.');
+            setGpsError('GPS signal temporarily timed out. Auto-refreshing in background...');
           },
           { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
         );
@@ -118,6 +118,48 @@ export function useUserLocation() {
       console.warn('Error starting watchPosition:', e);
     }
   }, [clearCurrentWatch]);
+
+  // Periodic background GPS polling every 5 seconds (silent, high-accuracy)
+  useEffect(() => {
+    const bgGpsInterval = setInterval(() => {
+      if (typeof window !== 'undefined' && navigator.geolocation && mountedRef.current) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            if (!mountedRef.current) return;
+            const { latitude, longitude, accuracy, heading, speed, altitude } = position.coords;
+            const acc = accuracy ? Math.round(accuracy) : 10;
+            const loc = {
+              lat: latitude,
+              lng: longitude,
+              accuracy: acc,
+              heading: heading || 0,
+              speed: speed || 0,
+              altitude: altitude || null,
+              source: 'gps',
+              name: `Live Location (±${acc}m)`,
+              timestamp: position.timestamp || Date.now()
+            };
+
+            setUserLocation(loc);
+            setAccuracyMeters(acc);
+            setGpsStatus('active');
+            setGpsError(null);
+          },
+          (err) => {
+            // Keep existing position on momentary background timeout
+            console.debug('Background GPS 5s poll notice:', err.code, err.message);
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 4000
+          }
+        );
+      }
+    }, 5000);
+
+    return () => clearInterval(bgGpsInterval);
+  }, []);
 
   // Request location automatically on mount
   useEffect(() => {

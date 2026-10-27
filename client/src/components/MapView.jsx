@@ -2,8 +2,6 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import {
-  Locate,
-  LocateFixed,
   Loader2,
   Navigation,
   MapPin,
@@ -149,11 +147,11 @@ function createStopIcon(seq, isNext = false, isNearest = false) {
   });
 }
 
-// Custom DivIcon for Authentic User GPS Location (High-visibility Pin with Radar Pulse)
-function createGpsUserIcon(locationName = 'My GPS Location') {
+// Custom DivIcon for Authentic User GPS Location (High-visibility Pin with Radar Pulse Icon)
+function createGpsUserIcon(locationName = 'Live Location') {
   const shortName = locationName && locationName.length > 22
     ? `${locationName.substring(0, 20)}...`
-    : (locationName || 'My GPS Location');
+    : (locationName || 'Live Location');
 
   return L.divIcon({
     className: 'custom-user-marker',
@@ -161,17 +159,21 @@ function createGpsUserIcon(locationName = 'My GPS Location') {
     iconAnchor: [60, 52],
     popupAnchor: [0, -52],
     html: `
-      <div class="user-marker-pin-wrap" style="cursor: pointer;">
+      <div class="user-marker-pin-wrap">
         <div class="user-marker-callout">
           <span class="user-marker-callout-dot"></span>
           <span>${shortName}</span>
         </div>
         <div class="user-marker-body">
           <div class="user-marker-radar"></div>
+          <div class="user-marker-radar-outer"></div>
           <div class="user-marker-pin-head">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="8" r="4"/>
-              <path d="M20 19v-1a7 7 0 0 0-14 0v1"/>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+              <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+              <circle cx="12" cy="12" r="2" fill="currentColor"/>
+              <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+              <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
             </svg>
           </div>
         </div>
@@ -280,24 +282,7 @@ export default function MapView({
     }
   }, [isFollowingBus, showToast]);
 
-  // Action: Center on User GPS Location
-  const handleLocateMe = useCallback(() => {
-    setIsFollowingBus(false);
-    setFollowPaused(false);
 
-    if (effectiveUserLocation?.lat && effectiveUserLocation?.lng) {
-      setInternalFocusTarget({
-        lat: effectiveUserLocation.lat,
-        lng: effectiveUserLocation.lng,
-        zoom: 17,
-        timestamp: Date.now()
-      });
-      showToast(`🛰️ Centered on your GPS (±${effectiveUserLocation.accuracy || 10}m)`);
-    } else {
-      onRequestGps?.();
-      showToast('📡 Acquiring fresh GPS satellite fix...');
-    }
-  }, [effectiveUserLocation, onRequestGps, showToast]);
 
   // Action: Focus / Follow Selected Bus
   const handleFocusBus = useCallback(() => {
@@ -412,12 +397,17 @@ export default function MapView({
           </button>
         ) : (
           <div className="map-crosshair-hint">
-            <span>
-              {effectiveUserLocation
-                ? `🛰️ Live GPS Active (±${effectiveUserLocation.accuracy || 10}m) • Tracking nearest stop`
-                : isLocatingState
-                ? '🛰️ Acquiring your device GPS location...'
-                : '📍 Tap "Me" to locate using your device GPS'}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              {effectiveUserLocation ? (
+                <>
+                  <span className="live-pulse-dot" />
+                  <span>Live Location (±{effectiveUserLocation.accuracy || 10}m) • Auto-syncing (5s)</span>
+                </>
+              ) : isLocatingState ? (
+                <span>🛰️ Acquiring device GPS location in background...</span>
+              ) : (
+                <span>📍 Device GPS auto-updating in background</span>
+              )}
             </span>
           </div>
         )}
@@ -445,9 +435,9 @@ export default function MapView({
       {/* 3. Floating User GPS ↔ Nearest Stop Live Status Bridge (Top-Center Floating Badge) */}
       {effectiveUserLocation && nearestStop && (
         <div className="map-user-stop-bridge">
-          <div className="bridge-pill" onClick={handleLocateMe} title="Center on your GPS location">
-            <span className="bridge-dot user-dot" />
-            <span className="bridge-name">My GPS</span>
+          <div className="bridge-pill" title="Live Location">
+            <span className="bridge-dot user-dot live-pulse" />
+            <span className="bridge-name">Live Location</span>
           </div>
 
           <div className="bridge-connector" onClick={handleFocusNearestStop} title="Show walking route to nearest stop">
@@ -466,24 +456,6 @@ export default function MapView({
 
       {/* 4. Floating Right-Side Controls Dock */}
       <div className="map-controls-dock">
-        {/* Locate Me (User GPS) Button */}
-        <button
-          type="button"
-          className={`map-dock-btn ${isLocatingState ? 'locating' : ''} ${isTrackingState ? 'active' : ''}`}
-          onClick={handleLocateMe}
-          title="Center on my GPS location"
-          aria-label="Center on my GPS location"
-        >
-          {isLocatingState ? (
-            <Loader2 size={19} className="spin" style={{ color: '#2563eb' }} />
-          ) : isTrackingState ? (
-            <LocateFixed size={19} style={{ color: '#2563eb' }} />
-          ) : (
-            <Locate size={19} />
-          )}
-          <span className="dock-btn-label">Me</span>
-        </button>
-
         {/* Focus Active Bus Button */}
         <button
           type="button"

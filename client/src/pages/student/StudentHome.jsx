@@ -8,12 +8,10 @@ import { useUserLocation } from '../../hooks/useUserLocation';
 import { supabase } from '../../lib/supabaseClient';
 import { getBusETA, findNearestStop, getClosestBusToStop, getDistanceMeters } from '../../lib/eta';
 import {
-  RefreshCw,
   Navigation,
   MapPin,
   Clock,
   Bus,
-  LocateFixed,
   AlertTriangle,
   Loader2,
   Footprints,
@@ -109,18 +107,6 @@ export default function StudentHome() {
     }
   }, [userLocation]);
 
-  // Action: Center map on student's GPS location (and refresh satellite fix)
-  const handleCenterOnUser = () => {
-    requestLocation();
-    if (userLocation?.lat && userLocation?.lng) {
-      setFocusTarget({
-        lat: userLocation.lat,
-        lng: userLocation.lng,
-        zoom: 17,
-        timestamp: Date.now()
-      });
-    }
-  };
 
   // Action: Focus on nearest stop
   const handleFocusNearestStop = () => {
@@ -271,10 +257,13 @@ export default function StudentHome() {
           <div className="user-gps-badge">
             {gpsStatus === 'active' && userLocation && (
               <>
-                <span className="pulse-dot live" />
+                <span className="live-location-pulse-wrap" title="Live Location Pulse">
+                  <span className="live-location-pulse-ring" />
+                  <Radio size={16} className="live-location-pulse-icon" />
+                </span>
                 <div>
                   <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span>🛰️ Live GPS Active</span>
+                    <span>Live Location</span>
                     <span style={{ fontSize: '0.7rem', padding: '1px 6px', background: '#d1fae5', color: '#047857', borderRadius: '4px' }}>
                       ±{userLocation.accuracy || 10}m accuracy
                     </span>
@@ -290,10 +279,10 @@ export default function StudentHome() {
                 <Loader2 size={16} className="spin" style={{ color: '#2563eb' }} />
                 <div>
                   <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e40af' }}>
-                    Acquiring Device GPS Satellite Fix...
+                    Acquiring Device GPS Fix...
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#3b82f6' }}>
-                    Please click "Allow" in your browser location prompt
+                    Syncing live location in background (every 5s)
                   </div>
                 </div>
               </>
@@ -319,31 +308,16 @@ export default function StudentHome() {
                     GPS Signal Notice
                   </div>
                   <div style={{ fontSize: '0.7rem', color: '#b91c1c' }}>
-                    {gpsError || 'Tap "Refresh GPS" to acquire a satellite fix'}
+                    {gpsError || 'Auto-retrying in background every 5s...'}
                   </div>
                 </div>
               </>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              type="button"
-              className="btn-gps-primary"
-              onClick={handleCenterOnUser}
-              title="Center on my GPS coordinates"
-            >
-              <LocateFixed size={14} /> Center on GPS
-            </button>
-
-            <button
-              type="button"
-              className="btn-gps-outline"
-              onClick={requestLocation}
-              title="Force poll fresh satellite GPS fix"
-            >
-              <RefreshCw size={13} /> Refresh GPS
-            </button>
+          <div className="gps-auto-sync-badge">
+            <span className="auto-sync-pulse" />
+            <span className="auto-sync-text">Auto-refreshing (5s)</span>
           </div>
         </div>
 
@@ -541,14 +515,10 @@ export default function StudentHome() {
                   To find your nearest stop from your live position, please allow location in your browser address bar.
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn btn-outline"
-                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                onClick={requestLocation}
-              >
-                <RefreshCw size={13} /> Retry GPS
-              </button>
+              <div className="gps-auto-sync-badge" style={{ background: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}>
+                <span className="auto-sync-pulse" style={{ backgroundColor: '#f59e0b' }} />
+                <span className="auto-sync-text">Auto-retrying (5s)</span>
+              </div>
             </div>
           </div>
         ) : (
@@ -557,20 +527,16 @@ export default function StudentHome() {
               <Radio size={28} style={{ color: '#64748b', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: '0 0 2px 0' }}>
-                  Ready to Detect Nearest Stop
+                  Detecting Nearest Stop
                 </h3>
                 <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
                   Nearest stop is calculated strictly and exclusively using your authentic device GPS coordinates.
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-                onClick={requestLocation}
-              >
-                <LocateFixed size={14} /> Detect My GPS
-              </button>
+              <div className="gps-auto-sync-badge">
+                <span className="auto-sync-pulse" />
+                <span className="auto-sync-text">Auto-detecting (5s)</span>
+              </div>
             </div>
           </div>
         )}
@@ -652,16 +618,11 @@ export default function StudentHome() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ padding: '6px 12px', fontSize: '0.8125rem' }}
-              onClick={refresh}
-              title="Refresh Fleet"
-            >
-              <RefreshCw size={14} /> Refresh
-            </button>
+          <div className="fleet-auto-sync-badge">
+            <span className="auto-sync-pulse" />
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              Auto-refreshing every 5s
+            </span>
           </div>
         </div>
 
